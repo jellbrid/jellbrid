@@ -25,7 +25,9 @@ class TorrentioClient:
         self.rd_api_key = cfg.rd_api_key
 
     def path_for_options(self, order: SortOrder, filter: QualityFilter) -> str:
-        return f"sort={order.value}|qualityfilter={filter.value}|debridoptions=nodownloadlinks,nocatalog|realdebrid={self.rd_api_key}/stream"
+        # path = f"sort={order.value}|qualityfilter={filter.value}|debridoptions=nodownloadlinks,nocatalog|realdebrid={self.rd_api_key}/stream"
+        path = f"sort={order.value}|qualityfilter={filter.value}/stream"
+        return path
 
     @alru_cache(ttl=60 * 60)  # cache torrents for 60 minutes
     async def get_movie_streams(

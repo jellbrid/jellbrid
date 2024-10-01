@@ -27,13 +27,17 @@ class BaseClient:
         params: dict | None = None,
         json_: dict | None = None,
         data: dict | None = None,
+        headers: dict | None = None,
     ) -> dict:
         if path.startswith("/"):
             logger.warning("Path will overwrite base path for request", path=path)
 
+        headers = headers or {}
+        headers.update(self.base_headers)
+
         url = urllib.parse.urljoin(self.base_url, path)
         response = await self.client.request(
-            method, url, headers=self.base_headers, params=params, json=json_, data=data
+            method, url, headers=headers, params=params, json=json_, data=data
         )
 
         logger.debug(f"{method} {response.request.url}", response=response.status_code)

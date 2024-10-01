@@ -31,3 +31,7 @@ dev-dependencies = [
 
 [tool.uv.sources]
 jellbrid = { workspace = true }
+
+[project.scripts]
+main = "main:main"
+cli = "cli:app"

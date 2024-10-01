@@ -207,7 +207,7 @@ async def handle_episode_request(
         logger.info("Unable to find any matching torrents")
 
 
-async def main():
+async def runit():
     cfg = Config()
     setup_logging(cfg.jellbrid_log_level)
     if cfg.dev_mode:
@@ -223,5 +223,9 @@ async def main():
     #    await anyio.sleep(60)
 
 
+def main():
+    anyio.run(runit)
+
+
 if __name__ == "__main__":
-    anyio.run(main)
+    anyio.run(runit)

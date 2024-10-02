@@ -13,7 +13,7 @@ from jellbrid.clients.realdebrid.filters import (
     is_cached_torrent,
 )
 from jellbrid.clients.seers import SeerrsClient, get_requests
-from jellbrid.clients.torrentio import TorrentioClient
+from jellbrid.clients.torrentio import SortOrder, TorrentioClient
 from jellbrid.clients.torrentio.filters import name_contains_full_season
 from jellbrid.config import Config
 from jellbrid.logging import setup_logging
@@ -117,7 +117,11 @@ async def handle_movie_request(
                     sync.refresh.set()
                     return
 
-        for s in streams[:10]:
+        streams = await tc.get_movie_streams(
+            request.imdb_id,
+            sort_order=SortOrder.QUALITY_THEN_SEEDERS,
+        )
+        for s in streams[:5]:
             if await has_file_count(rdbc, s, 1):
                 await download(rdbc, s)
                 cache[request.imdb_id] = True
@@ -197,8 +201,15 @@ async def handle_episode_request(
                     sync.refresh.set()
                     return
 
+        streams = await tc.get_show_streams(
+            request.imdb_id,
+            request.season_id,
+            request.episode_id,
+            sort_order=SortOrder.QUALITY_THEN_SEEDERS,
+        )
+
         # search for an uncached torrent with just the episode we want
-        for s in streams:
+        for s in streams[:5]:
             if await has_file_count(rdbc, s, 1):
                 if await download(rdbc, s):
                     cache[cache_key] = True

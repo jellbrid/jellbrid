@@ -11,6 +11,7 @@ from jellbrid.config import Config
 class SortOrder(enum.Enum):
     QUALITY_THEN_SIZE = "qualitysize"
     QUALITY_THEN_SEEDERS = ""
+    SEEDERS = "seeders"
 
 
 class QualityFilter(enum.Enum):

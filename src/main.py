@@ -93,7 +93,6 @@ async def handler(
         logger.info("Sleeping to give requests time to update")
         await anyio.sleep(10)
         sync.reset()
-    return
 
 
 async def handle_movie_request(
@@ -218,7 +217,7 @@ async def handle_episode_request(
         logger.info("Unable to find any matching torrents")
 
 
-async def runit():
+async def runit(run_once: bool = True):
     cfg = Config()
     setup_logging(cfg.jellbrid_log_level)
     if cfg.dev_mode:
@@ -227,11 +226,14 @@ async def runit():
     # make these here to persist caches across runs
     rdbc = RealDebridClient(cfg)
     tc = TorrentioClient(cfg)
+    cache = cachetools.TTLCache(100, 60 * 60)
 
-    # while True:
-    await handler(cfg, rdbc=rdbc, tc=tc, cache=cachetools.TTLCache(100, 60 * 60))
-    logger.info("Completed request processing")
-    #    await anyio.sleep(60)
+    while True:
+        await handler(cfg, rdbc=rdbc, tc=tc, cache=cache)
+        logger.info("Completed request processing")
+        if run_once:
+            break
+        await anyio.sleep(60)
 
 
 def main():

@@ -1,10 +1,13 @@
+from typing import Annotated
+
 import anyio
 import httpx
+import typer
 from authlib.integrations import httpx_client
 from rich.pretty import pprint
 
 from jellbrid.cli.base import AsyncTyper
-from jellbrid.clients.realdebrid import RealDebridClient
+from jellbrid.clients.realdebrid import RealDebridClient, TorrentStatus
 from jellbrid.config import Config
 
 app = AsyncTyper()
@@ -36,6 +39,29 @@ async def show_files(hash: str):
 async def add_magnet(hash: str):
     rdbc = RealDebridClient(Config())
     await rdbc.add_magnet(hash)
+
+
+@app.command()
+async def get_torrents(
+    downloading: Annotated[bool, typer.Option("--downloading", "-d")] = False,
+):
+    rdbc = RealDebridClient(Config())
+    status = TorrentStatus.DOWNLOADING if downloading else None
+    results = await rdbc.get_torrents(status=status)
+    pprint(results)
+
+
+@app.command()
+async def clear_stuck_torrents():
+    rdbc = RealDebridClient(Config())
+    results = await rdbc.get_torrents(TorrentStatus.DOWNLOADING)
+
+    deleted = []
+    for r in results:
+        if r["seeders"] == 0:
+            await rdbc.delete_magnet(r["id"])
+            deleted.append(r)
+    pprint(deleted)
 
 
 @app.command()

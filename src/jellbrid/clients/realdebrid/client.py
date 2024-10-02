@@ -5,7 +5,7 @@ import structlog
 from async_lru import alru_cache
 
 from jellbrid.clients.base import BaseClient
-from jellbrid.clients.realdebrid.types import MagnetAddedResponse
+from jellbrid.clients.realdebrid.types import MagnetAddedResponse, TorrentStatus
 from jellbrid.config import Config
 
 logger = structlog.get_logger(__name__)
@@ -121,3 +121,9 @@ class RealDebridClient:
             yield torrent_id
         finally:
             await self.delete_magnet(torrent_id)
+
+    async def get_torrents(self, status: TorrentStatus | None = None):
+        results = await self.client.request("GET", "torrents")
+        if status:
+            return [r for r in results if r["status"] == status.value]
+        return results

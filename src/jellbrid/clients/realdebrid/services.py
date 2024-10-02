@@ -24,7 +24,9 @@ async def download(rdbc: RealDebridClient, stream: Stream):
         if is_cached:
             files = await rdbc.collect_file_ids_from_cached_torrent(stream["infoHash"])
         else:
-            files = await rdbc.collect_file_ids_from_new_torrent(torrent["id"])
+            files = await rdbc.collect_file_ids_from_uncached_torrent(
+                stream["infoHash"]
+            )
 
         result = await rdbc.select_files(torrent["id"], files)
         if "error" in result:

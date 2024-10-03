@@ -146,22 +146,13 @@ async def handle_season_request(
         streams = await tc.get_show_streams(request.imdb_id, request.season_id, 1)
 
         # first try to find a cached candidate with the full season
-        for s in streams:
-            if (
-                name_contains_full_season(tc, s, request)
-                and await is_cached_torrent(rdbc, s)
-                and await has_file_ratio(rdbc, s, request, 0.8)
-            ):
-                if await download(rdbc, s):
+            if name_contains_full_season(s, request):
+                count = int(len(request.episodes) * 0.8)
                     sync.refresh.set()
                     return
 
         # then try to find a cached candidate that hopefully has most of the
-        # files we want. we can download the episodes individually later on
-        for s in streams:
-            if name_contains_full_season(tc, s, request) and await is_cached_torrent(
-                rdbc, s
-            ):
+            if name_contains_full_season(s, request):
                 if await download(rdbc, s):
                     sync.refresh.set()
                     return

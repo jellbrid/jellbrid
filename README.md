@@ -1,5 +1,4 @@
 ### TODO
-- allow older series to have worse quality profiles 
 - auto remove redundant torrents
 - auto update files to 4k
 - accept webhooks from seerrs to start a DL (instead of? in addition to? polling)
@@ -15,7 +14,6 @@
 - implement some sort of exponential backoff for requests that continuously just
   dont exist (like the looney toons seasons/episodes)
 - implement some sort of backoff for downloads that fail
-
 
 ### Done
 - implement uncached downloads by number of seeders - X
@@ -43,3 +41,4 @@
   - TC
     - if not tc.contains_full_season(s, request.season_id) - X
 - filter titles with short/common names with their release year (i.e. Haunt) - X 
+- allow older series to have worse quality profiles - X

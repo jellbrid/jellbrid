@@ -64,8 +64,12 @@ async def parse_request(
                 imdb_id=details["externalIds"]["imdbId"],
                 season_id=season_id,
                 episodes=[e["name"] for e in episodes],
+                release_date=details["firstAirDate"],
             )
             yield t.cast(MediaRequest, sr)
+        elif season["status"] == 1:
+            # status is unknown
+            processed_seasons.discard(season_id)
 
     # process all requested seasons, ignoring the ones we processed above
     for season in full_request["seasons"]:
@@ -81,6 +85,7 @@ async def parse_request(
             imdb_id=details["externalIds"]["imdbId"],
             season_id=season_id,
             episodes=[e["name"] for e in episodes],
+            release_date=details["firstAirDate"],
         )
         yield t.cast(MediaRequest, sr)
 
@@ -113,6 +118,7 @@ async def create_episode_requests(
             imdb_id=show_info["externalIds"]["imdbId"],
             season_id=season_id,
             episode_id=episode["episodeNumber"],
+            release_date=episode["airDate"],
         )
 
 

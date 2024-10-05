@@ -57,6 +57,7 @@ class SeerrShowDetail(t.TypedDict):
     name: str
     seasons: list["ShowDetailSeason"]
     mediaInfo: "SeerrMediaInfo"
+    firstAirDate: str
 
 
 class ShowDetailSeason(t.TypedDict):

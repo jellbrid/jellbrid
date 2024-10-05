@@ -17,16 +17,11 @@ class MediaRequest:
     imdb_id: str
     tmdb_id: int
     title: str
+    release_date: str
 
     @property
     def ctx(self) -> dict:
         return asdict(self)
-
-
-@dataclass(kw_only=True)
-class MovieRequest(MediaRequest):
-    type: MediaType = MediaType.Movie
-    release_date: str
 
     @property
     def release_year(self):
@@ -34,10 +29,16 @@ class MovieRequest(MediaRequest):
 
 
 @dataclass(kw_only=True)
+class MovieRequest(MediaRequest):
+    type: MediaType = MediaType.Movie
+
+
+@dataclass(kw_only=True)
 class SeasonRequest(MediaRequest):
     type: MediaType = MediaType.Season
     season_id: int
     episodes: list[str]
+    release_date: str
 
     @property
     def ctx(self) -> dict:
@@ -55,6 +56,7 @@ class SeasonRequest(MediaRequest):
                 season_id=self.season_id,
                 episode_name=name,
                 episode_id=i,
+                release_date=self.release_date,  # TODO - make this accurate
             )
             requests.append(er)
         return requests

@@ -1,6 +1,5 @@
 ### TODO
 - allow older series to have worse quality profiles 
-- filter titles with short/common names with their release year (i.e. Haunt)
 - auto remove redundant torrents
 - auto update files to 4k
 - accept webhooks from seerrs to start a DL (instead of? in addition to? polling)
@@ -43,3 +42,4 @@
     - collecting filenames/fileids based on extension
   - TC
     - if not tc.contains_full_season(s, request.season_id) - X
+- filter titles with short/common names with their release year (i.e. Haunt) - X 

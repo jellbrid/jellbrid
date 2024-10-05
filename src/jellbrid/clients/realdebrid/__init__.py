@@ -1,9 +1,12 @@
+from .bundle import RDBundle, RDBundleManager
 from .client import RealDebridClient
-from .services import download
+from .downloader import RealDebridDownloader
 from .types import TorrentStatus
 
 __all__ = (
     "RealDebridClient",
-    "download",
+    "RDBundleManager",
+    "RDBundle",
+    "RealDebridDownloader",
     "TorrentStatus",
 )

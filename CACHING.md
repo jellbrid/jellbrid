@@ -1,68 +1,51 @@
 
-# Caching counts for Media Requests
+# API call for Media Requests
 
-Torrentio
-- 1 to Torrentio for streams
+## Downloading a cached MediaRequest 
 
-RD
-- 1 to determine instantAvailability (if it is, this gets cached)
+5 requests [1 Torrentio, 4 RD]
 
-To download cached:
-- 1 to RD to add magnet
-# - 1 to get files
-- 1 to select files
-TOTAL: 4 API calls (1 Torrentio, 3 RD)
-        2 API calls to check stream (1 Torrentio, 1 RD)
+- 1 Torrentio: get candidate streams
+- 1 RD: determine instant availability for all streams
+- 1 RD: add magnet
+- 1 RD: get files [cached]
+- 1 RD: select files
 
-To download uncached:
-- 1 to RD to add magnet
-- 1 to RD to get file ids from torrent (this gets cached)
-- 1 to RD to delete magnet
-[check stream criteria]
-- 1 to RD to add magnet
-# - 1 to get files
-- 1 to select files
+## Downloading an uncached MediaRequest 
 
-TOTAL: 7 API calls (1 Torrentio, 6 RD)
-        5 API calls to check stream (1 Torrentio, 4 RD)
+4 requests [1 Torrentio, 3 RD] + 3 * Streams [RD]
 
-Each MediaRequest = 1 (1 T)
-
-Per stream:
-    Cached - 1 (1 RD)
-    Uncached - 4 (4 RD)
-
-Download:
-    Cached - 3 (3 RD) [Adds 2 on top of per stream]
-    Uncached - 6 (6 RD) [Adds 2 on top of per stream] (this is because of the
-    step to add the magnet, check the files, then delete it)
-
+- 1 Torrentio: get candidate streams
+- 1 RD: determine instant availability for all streams
+- 1 RD: add magnet         -|
+- 1 RD: get files [cached]  |--- repeated for every stream
+- 1 RD: delete magnet      -|
+- 1 RD: add magnet
+- 1 RD: select files
 
 # Cache locations
-- alru_cache TTL
-    - RD (60 mins)
-        - get_cached_torrent_data
-          I'm caching this so that multiple lookups for a stream don't hit the
-          RD API. We do ~2 in the course of a lookup: once to determine if the
-          hash is cached, then again to pull the data for use. I think 30
-          minutes is fine although it could be lower
+- TTLCache 
+  - RD (60 minutes)
+    - get_instant_availability_data
+        
+        Each hash is individually cached so that if we do either a single lookup
+        / a bulk lookup, hashes that are cached are not queried for. This is
+        used to determine if the hash is cached on RD and then again for file
+        filtering and selection.
+        
+  - Torrentio (60 minutes)
+    - get_show_streams (IMDB-season-episode)
+    - get_movie_streams (IMDB)
+    
+  ** NOTE ** The results from Torrentio are used directly in RD for looking up
+  instantly available data, so it makes sense to keep those cache TTLs the same 
 
-    - Torrentio (1 hour)
-        - streams for movies (by IMDB)
-        - streams for shows (by IMDB, season #, episode #)
+- TTLCache 
+  - Seerrs (60 mins)
+    - checks if each request is in the cache. Requests are cached if an non
+      instantly available download begins. 
 
-    ** NOTE ** The results that we get from torrentio are used directly in RD
-    for looking up cached data. So it probably makes sense to keep those cache
-    TTLs the same
-
-  - TTLCache (60 mins)
-    - Movie Requests
-        - caches by IMDB ID IFF a non-cached download was initiated
-    - Season Requests
-        - caches by IMDB ID iff a non-cached download was initiated
-    - Episode Requests
-        - caches by IMDB ID- season ID - episode ID iff a non-cached download
-          was initiated
+    - MovieRequests are (IMDB), EpisodeRequests are (IMDB-season-episode)
 
     ** NOTE ** This cache is just used to make sure we aren't enqueueing the
     same request for a torrent that's downloading. The expectation with the TTL

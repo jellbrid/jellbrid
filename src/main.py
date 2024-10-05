@@ -6,15 +6,9 @@ import structlog
 from cachetools import Cache
 
 from jellbrid.clients.jellyfin import JellyfinClient, scan_and_wait_for_completion
-from jellbrid.clients.realdebrid import RealDebridClient, download
-from jellbrid.clients.realdebrid.filters import (
-    has_file_count,
-    has_file_ratio,
-    is_cached_torrent,
-)
+from jellbrid.clients.realdebrid import RealDebridClient, RealDebridDownloader
 from jellbrid.clients.seers import SeerrsClient, get_requests
-from jellbrid.clients.torrentio import SortOrder, TorrentioClient
-from jellbrid.clients.torrentio.filters import name_contains_full_season
+from jellbrid.clients.torrentio import TorrentioClient
 from jellbrid.config import Config
 from jellbrid.logging import setup_logging
 from jellbrid.requests import EpisodeRequest, MediaType, MovieRequest, SeasonRequest
@@ -32,7 +26,12 @@ class Synchronizer:
 
 
 async def handler(
-    cfg: Config, *, rdbc: RealDebridClient, tc: TorrentioClient, cache: Cache
+    cfg: Config,
+    *,
+    rdbc: RealDebridClient,
+    tc: TorrentioClient,
+    cache: Cache,
+    tmdb_id: int | None = None,
 ):
     seers = SeerrsClient(cfg)
     jc = JellyfinClient(cfg)
@@ -43,7 +42,10 @@ async def handler(
             with structlog.contextvars.bound_contextvars(
                 **request.ctx, dev_mode=cfg.dev_mode
             ):
-                if request.tmdb_id != 533535:
+                if request.imdb_id == "":
+                    logger.warning("Unable to find IMDB for request")
+                    continue
+                if tmdb_id is not None and request.tmdb_id != tmdb_id:
                     continue
                 match request.type:
                     case MediaType.Movie:
@@ -108,23 +110,24 @@ async def handle_movie_request(
 
     async with sync.semaphore:
         logger.info("Starting request handler")
+
+        # Look for the highest quality, instantly available stream
         streams = await tc.get_movie_streams(request.imdb_id)
+        rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
 
-        for s in streams:
-            if await is_cached_torrent(rdbc, s) and await has_file_count(rdbc, s, 1):
-                if await download(rdbc, s):
-                    sync.refresh.set()
-                    return
+        downloaded = await rdd.download_movie(await rdd.instantly_available_streams)
+        if downloaded:
+            sync.refresh.set()
+            return
 
-        streams = await tc.get_movie_streams(
-            request.imdb_id,
-            sort_order=SortOrder.QUALITY_THEN_SEEDERS,
-        )
-        for s in streams[:5]:
-            if await has_file_count(rdbc, s, 1):
-                await download(rdbc, s)
-                cache[request.imdb_id] = True
-                return
+        # Look for a the highest quality stream with many seeders
+        # only perform the search if we previously got any results at all
+        # TODO: remove cached streams from this, sort the streams ourselves
+        downloaded = await rdd.download_movie(await rdd.unavailable_streams)
+        if downloaded:
+            sync.refresh.set()
+            cache[request.imdb_id] = True
+            return
 
         logger.info("Unable to find any matching torrents")
 
@@ -143,19 +146,15 @@ async def handle_season_request(
 
     async with sync.semaphore:
         logger.info("Starting request handler")
-        streams = await tc.get_show_streams(request.imdb_id, request.season_id, 1)
 
         # first try to find a cached candidate with the full season
-            if name_contains_full_season(s, request):
-                count = int(len(request.episodes) * 0.8)
-                    sync.refresh.set()
-                    return
+        streams = await tc.get_show_streams(request.imdb_id, request.season_id, 1)
 
-        # then try to find a cached candidate that hopefully has most of the
-            if name_contains_full_season(s, request):
-                if await download(rdbc, s):
-                    sync.refresh.set()
-                    return
+        rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
+        downloaded = await rdd.download_show(await rdd.instantly_available_streams)
+        if downloaded:
+            sync.refresh.set()
+            return
 
         logger.info("Unable to find any matching torrents")
 
@@ -180,35 +179,39 @@ async def handle_episode_request(
 
     async with sync.semaphore:
         logger.info("Starting request handler")
+
         streams = await tc.get_show_streams(
             request.imdb_id, request.season_id, request.episode_id
         )
 
         # search for a cached torrent with just the episode we want
-        for s in streams:
-            if await is_cached_torrent(rdbc, s) and await has_file_count(rdbc, s, 1):
-                if await download(rdbc, s):
-                    sync.refresh.set()
-                    return
+        rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
+        downloaded = await rdd.download_episode(await rdd.instantly_available_streams)
+        if downloaded:
+            sync.refresh.set()
+            return
 
-        streams = await tc.get_show_streams(
-            request.imdb_id,
-            request.season_id,
-            request.episode_id,
-            sort_order=SortOrder.QUALITY_THEN_SEEDERS,
+        # search for the episode we want inside of a cached torrent
+        downloaded = await rdd.download_episode_from_bundle(
+            await rdd.instantly_available_streams
         )
+        if downloaded:
+            sync.refresh.set()
+            cache[cache_key] = True
+            return
 
         # search for an uncached torrent with just the episode we want
-        for s in streams[:5]:
-            if await has_file_count(rdbc, s, 1):
-                if await download(rdbc, s):
-                    cache[cache_key] = True
-                    return
+        # TODO: sort the streams ourselves
+        downloaded = await rdd.download_episode(await rdd.unavailable_streams)
+        if downloaded:
+            sync.refresh.set()
+            cache[cache_key] = True
+            return
 
         logger.info("Unable to find any matching torrents")
 
 
-async def runit(run_once: bool = True):
+async def runit(run_once: bool = True, tmdb_id: int | None = None):
     cfg = Config()
     setup_logging(cfg.jellbrid_log_level)
     if cfg.dev_mode:
@@ -220,7 +223,7 @@ async def runit(run_once: bool = True):
     cache = cachetools.TTLCache(100, 60 * 60)
 
     while True:
-        await handler(cfg, rdbc=rdbc, tc=tc, cache=cache)
+        await handler(cfg, rdbc=rdbc, tc=tc, cache=cache, tmdb_id=tmdb_id)
         logger.info("Completed request processing")
         if run_once:
             break

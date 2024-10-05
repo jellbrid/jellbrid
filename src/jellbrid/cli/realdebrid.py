@@ -14,25 +14,20 @@ app = AsyncTyper()
 
 
 @app.command()
-async def lookup_hash(hash: str):
+async def lookup_hash(hashes: list[str]):
     rdbc = RealDebridClient(Config())
-
-    results = await rdbc.get_cached_torrent_data(hash)
+    results = await rdbc.get_instant_availability_data(hashes)
     pprint(results)
 
 
 @app.command()
-async def instant_availability(hash: str):
+async def filter_instants(hashes: list[str]):
     rdbc = RealDebridClient(Config())
-    result = await rdbc.has_cached(hash)
-    pprint(result)
 
-
-@app.command()
-async def show_files(hash: str):
-    rdbc = RealDebridClient(Config())
-    files_in_stream = await rdbc.collect_filenames_from_cached_torrent(hash)
-    pprint(sorted(files_in_stream))
+    while True:
+        results = await rdbc.filter_instantly_available(hashes)
+        pprint(results)
+        await anyio.sleep(5)
 
 
 @app.command()

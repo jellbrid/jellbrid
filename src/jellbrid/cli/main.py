@@ -21,5 +21,6 @@ app.add_typer(seerrs, name="seerrs")
 @app.command()
 async def jellbrid(
     loop: t.Annotated[bool, typer.Option("--loop")] = False,
+    tmdb_id: int | None = None,
 ):
-    await runit(run_once=loop)
+    await runit(run_once=loop, tmdb_id=tmdb_id)

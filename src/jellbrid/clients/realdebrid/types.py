@@ -1,6 +1,9 @@
 import enum
 import typing as t
 
+RDBundleFileFilter = t.Callable[[str], bool]
+InstantAvailablityType = dict[str, dict[str, list[dict[str, dict]]]]
+
 
 class CachedTorrent(t.TypedDict):
     filename: str

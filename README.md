@@ -1,4 +1,6 @@
 ### TODO
+- allow older series to have worse quality profiles 
+- filter titles with short/common names with their release year (i.e. Haunt)
 - auto remove redundant torrents
 - auto update files to 4k
 - accept webhooks from seerrs to start a DL (instead of? in addition to? polling)
@@ -6,21 +8,15 @@
 - keep track of stats:
   # of torrentio requests per media request
   # of of RD requests per media request
-- make RDBC file selection rules pluggable (using some sort of list of filters)
-  - RDBC
-    - rdbc.has_cached(s["infoHash"]
-    - if (len(files) / len(request.episodes)) < 0.8
-    - if len(files) != 1
-    - collecting filenames/fileids based on extension
-
-  - TC
-    - if not tc.contains_full_season(s, request.season_id) - X
-
 - implement JF + seer scans on uncached download completion
   - delete the download if it failed
+  - this could probably just be a task that iterates thru the cache contents and
+    checks their status. deleting if the seeders is None. and then using a
+    secondary cache to make that request unavailable for a while?
 - implement some sort of exponential backoff for requests that continuously just
   dont exist (like the looney toons seasons/episodes)
 - implement some sort of backoff for downloads that fail
+
 
 ### Done
 - implement uncached downloads by number of seeders - X
@@ -35,3 +31,15 @@
       "jellyfinMediaId" that maps the show to to jellyfin. We can pull episode
       information from jellyfin (what we have) and compare to what's missing in
       Overseerr, giving us what we need
+- TODO: inspect the RD cached results more closely. sometimes, the
+  instantAvailability results contain a sub-dict of files that seems to indicate
+  that files within that subdict could be instantly-downloaded separately from
+  everything else. i.e. "fba8d22d247726db32dc03911984008315656856" - X
+- make RDBC file selection rules pluggable - X
+  - RDBC
+    - rdbc.has_cached(s["infoHash"]
+    - if (len(files) / len(request.episodes)) < 0.8
+    - if len(files) != 1
+    - collecting filenames/fileids based on extension
+  - TC
+    - if not tc.contains_full_season(s, request.season_id) - X

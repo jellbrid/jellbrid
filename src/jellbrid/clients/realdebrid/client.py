@@ -3,9 +3,16 @@ from contextlib import asynccontextmanager
 
 import structlog
 from async_lru import alru_cache
+from cachetools import TTLCache
 
 from jellbrid.clients.base import BaseClient
-from jellbrid.clients.realdebrid.types import MagnetAddedResponse, TorrentStatus
+from jellbrid.clients.realdebrid.bundle import RDBundleManager
+from jellbrid.clients.realdebrid.types import (
+    InstantAvailablityType,
+    MagnetAddedResponse,
+    RDBundleFileFilter,
+    TorrentStatus,
+)
 from jellbrid.config import Config
 
 logger = structlog.get_logger(__name__)
@@ -17,28 +24,72 @@ class RealDebridClient:
             url=cfg.rd_api_url, headers={"Authorization": f"Bearer {cfg.rd_api_key}"}
         )
         self.cfg = cfg
+        self.cache = TTLCache(maxsize=150, ttl=60 * 60)
 
-    @alru_cache(ttl=60 * 60)
-    async def get_cached_torrent_data(
-        self, hash: str
-    ) -> dict[str, list[dict[str, dict]]]:
-        hash = hash.lower()
+    async def get_instant_availability_data(
+        self, hashes: list[str]
+    ) -> InstantAvailablityType:
+        """
+        Returns results for some/all hashes from a cache, if possible
+        """
+        results, misses = {}, []
+
+        # get results from cache
+        for h in [h.lower() for h in hashes]:
+            cached_data = self.cache.get(h, None)
+            if cached_data is not None:
+                results[h] = cached_data
+            else:
+                misses.append(h)
+
+        if misses:
+            # submit a request for missing hashes
+            all_data = await self._get_instant_availability_data(misses)
+
+            # update cache with results from data
+            for key, data in all_data.items():
+                self.cache[key] = data
+
+            # update our results
+            results.update(all_data)
+
+        return results
+
+    async def _get_instant_availability_data(
+        self, hashes: list[str]
+    ) -> InstantAvailablityType:
+        """
+        Performs the base HTTP request against RD, with some normalization if needed
+        """
+        hashes_ = [h.lower() for h in hashes]
         result = await self.client.request(
-            "GET", f"torrents/instantAvailability/{hash}"
+            "GET", f"torrents/instantAvailability/{'/'.join(hashes_)}"
         )
         if isinstance(result, list):
             result = {}
 
-        data = result.get(hash, {})
-        return {} if data == [] else data
+        return result
 
-    async def has_cached(self, hash: str) -> bool:
-        result = await self.get_cached_torrent_data(hash)
-        rd_data = result.get("rd", [])
+    async def filter_instantly_available(
+        self, hashes: list[str]
+    ) -> InstantAvailablityType:
+        candidates = await self.get_instant_availability_data(hashes)
+
+        results = {}
+        for key, data in candidates.items():
+            if data == []:
+                continue
+            if data.get("rd", []) == []:
+                continue
+            results[key] = data
+        return results
+
+    async def instantly_available(self, hash: str) -> bool:
+        result = await self.get_instant_availability_data([hash])
+        if result.get(hash, {}) == []:
+            return False
+        rd_data = result.get(hash, {}).get("rd", [])
         return len(rd_data) > 0
-
-    async def get_torrent_files_info(self, torrent_id: str) -> dict:
-        return await self.client.request("GET", f"torrents/info/{torrent_id}")
 
     async def add_magnet(self, hash: str) -> MagnetAddedResponse:
         if not hash.startswith("magnet:?xt=urn:btih:"):
@@ -59,56 +110,20 @@ class RealDebridClient:
             data={"files": ",".join(files)},
         )
 
-    async def collect_file_ids_from_new_torrent(self, torrent_id: str) -> set[str]:
-        info = await self.get_torrent_files_info(torrent_id)
+    async def get_torrents(self, status: TorrentStatus | None = None):
+        results = await self.client.request("GET", "torrents")
+        if status:
+            return [r for r in results if r["status"] == status.value]
+        return results
 
-        files_to_get: set[str] = set()
-        for file_data in info.get("files", []):
-            filename: str = file_data.get("path").lower()
-            file_id = file_data.get("id")
-            if "sample" in filename:
-                continue
-            if (
-                filename.endswith("mp4")
-                or filename.endswith("mkv")
-                or filename.endswith("avi")
-            ):
-                files_to_get.add(str(file_id))
-        return files_to_get
-
-    async def collect_file_ids_from_cached_torrent(self, hash: str) -> set[str]:
-        return await self._collect_files_from_cached_torrent(hash, "file_id")
-
-    async def collect_filenames_from_cached_torrent(self, hash: str) -> set[str]:
-        return await self._collect_files_from_cached_torrent(hash, "filename")
-
-    async def _collect_files_from_cached_torrent(
-        self, hash: str, item: t.Literal["filename"] | t.Literal["file_id"]
-    ) -> set[str]:
-        cached_response = await self.get_cached_torrent_data(hash)
-
-        files_to_get: set[str] = set()
-        for file_entry in cached_response.get("rd", []):
-            for file_id, file_data in file_entry.items():
-                filename: str = file_data.get("filename", "").lower()
-                if "sample" in filename:
-                    continue
-                if (
-                    filename.endswith("mp4")
-                    or filename.endswith("mkv")
-                    or filename.endswith("avi")
-                ):
-                    if item == "filename":
-                        files_to_get.add(filename)
-                    if item == "file_id":
-                        files_to_get.add(file_id)
-        return files_to_get
+    async def get_torrent_files_info(self, torrent_id: str) -> dict:
+        return await self.client.request("GET", f"torrents/info/{torrent_id}")
 
     @alru_cache(ttl=60 * 60)
-    async def collect_file_ids_from_uncached_torrent(self, hash: str) -> set[str]:
+    async def collect_data_from_uncached_torrent(self, hash: str) -> dict:
         async with self.tmp_torrent(hash) as tmp_torrent_id:
-            files = await self.collect_file_ids_from_new_torrent(tmp_torrent_id)
-        return files
+            data = await self.get_torrent_files_info(tmp_torrent_id)
+        return data
 
     @asynccontextmanager
     async def tmp_torrent(self, hash: str):
@@ -122,8 +137,40 @@ class RealDebridClient:
         finally:
             await self.delete_magnet(torrent_id)
 
-    async def get_torrents(self, status: TorrentStatus | None = None):
-        results = await self.client.request("GET", "torrents")
-        if status:
-            return [r for r in results if r["status"] == status.value]
-        return results
+    async def get_rd_bundle_with_file_count(
+        self,
+        hash: str,
+        count: int,
+        *,
+        file_filters: list[RDBundleFileFilter] | None = None,
+    ):
+        rdc = await self._get_bundle_manager(hash, file_filters)
+        return rdc.get_bundle_of_size(count)
+
+    async def get_rd_bundle_with_file_count_gte(
+        self,
+        hash: str,
+        count: int,
+        *,
+        file_filters: list[RDBundleFileFilter] | None = None,
+    ):
+        rdc = await self._get_bundle_manager(hash, file_filters)
+        return rdc.get_bundle_gte_size(count)
+
+    async def get_rd_bundle_with_file_match(
+        self, hash: str, *, file_filters: list[RDBundleFileFilter] | None = None
+    ):
+        rdc = await self._get_bundle_manager(hash, file_filters)
+        return rdc.get_bundle_with_match()
+
+    async def _get_bundle_manager(
+        self,
+        hash,
+        file_filters: list[RDBundleFileFilter] | None = None,
+    ):
+        if await self.instantly_available(hash):
+            data = await self.get_instant_availability_data([hash])
+            data = data[hash].get("rd", [])
+        else:
+            data = await self.collect_data_from_uncached_torrent(hash)
+        return RDBundleManager(data, file_filters=file_filters)

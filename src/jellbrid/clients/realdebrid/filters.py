@@ -35,5 +35,8 @@ def filter_extension(filename: str):
 
     filename = filename.lower()
     return (
-        filename.endswith("mp4") or filename.endswith("mkv") or filename.endswith("avi")
+        filename.endswith("mp4")
+        or filename.endswith("mkv")
+        or filename.endswith("avi")
+        or filename.endswith("mpg")
     )

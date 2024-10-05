@@ -45,6 +45,7 @@ class MediaRequestSeason(t.TypedDict):
 class SeerrMovieDetail(t.TypedDict):
     imdbId: str
     title: str
+    releaseDate: str
 
 
 class ExternalIds(t.TypedDict):

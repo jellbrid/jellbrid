@@ -26,6 +26,11 @@ class MediaRequest:
 @dataclass(kw_only=True)
 class MovieRequest(MediaRequest):
     type: MediaType = MediaType.Movie
+    release_date: str
+
+    @property
+    def release_year(self):
+        return self.release_date.split("-")[0]
 
 
 @dataclass(kw_only=True)

@@ -12,7 +12,10 @@ from jellbrid.clients.realdebrid.filters import (
 )
 from jellbrid.clients.realdebrid.types import RDBundleFileFilter
 from jellbrid.clients.torrentio import Stream
-from jellbrid.clients.torrentio.filters import name_contains_full_season
+from jellbrid.clients.torrentio.filters import (
+    name_contains_full_season,
+    name_contains_release_year,
+)
 from jellbrid.requests import EpisodeRequest, MovieRequest, SeasonRequest
 
 logger = structlog.get_logger(__name__)
@@ -54,6 +57,13 @@ class RealDebridDownloader:
         results = []
         for stream in streams:
             if name_contains_full_season(stream, t.cast(SeasonRequest, self.request)):
+                results.append(stream)
+        return results
+
+    def _filter_streams_with_release_year(self, streams: list[Stream]) -> list[Stream]:
+        results = []
+        for stream in streams:
+            if name_contains_release_year(stream, t.cast(MovieRequest, self.request)):
                 results.append(stream)
         return results
 
@@ -104,6 +114,10 @@ class RealDebridDownloader:
         return bundle
 
     async def download_movie(self, streams: list[Stream]):
+        # try to get better results on movies with ambiguous titles
+        if len(self.request.title) < 6:
+            streams = self._filter_streams_with_release_year(streams)
+
         for stream in streams:
             with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
                 bundle = await self._find_bundle_with_file_count(stream, 1)

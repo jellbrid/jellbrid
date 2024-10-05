@@ -22,7 +22,10 @@ async def parse_request(
     if request["type"] == "movie":
         details = await sc.get_movie_details(tmdb_id)
         mr = MovieRequest(
-            title=details["title"], imdb_id=details["imdbId"], tmdb_id=tmdb_id
+            title=details["title"],
+            imdb_id=details["imdbId"],
+            tmdb_id=tmdb_id,
+            release_date=details["releaseDate"],
         )
         yield t.cast(MediaRequest, mr)
         return

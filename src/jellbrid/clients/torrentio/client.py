@@ -1,3 +1,4 @@
+import datetime
 import enum
 import re
 
@@ -15,8 +16,9 @@ class SortOrder(enum.Enum):
 
 
 class QualityFilter(enum.Enum):
-    HD = "480p,scr,cam,720p"
     UHD = "480p,scr,cam,720p,1080p"
+    HD = "480p,scr,cam,720p"
+    OLD = "scr,cam"
 
 
 class TorrentioClient:
@@ -24,6 +26,10 @@ class TorrentioClient:
         self.client = BaseClient(cfg.torrentio_url)
         self.cfg = cfg
         self.rd_api_key = cfg.rd_api_key
+
+    def is_older_media(self, release_year: str):
+        release_year_ = int(release_year)
+        return (datetime.datetime.now().year - release_year_) > 15
 
     def path_for_options(self, order: SortOrder, filter: QualityFilter) -> str:
         # path = f"sort={order.value}|qualityfilter={filter.value}|debridoptions=nodownloadlinks,nocatalog|realdebrid={self.rd_api_key}/stream"

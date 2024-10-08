@@ -18,7 +18,7 @@ class SqliteRequestRepo:
 
     async def has_movie(self, imdb_id: str):
         async with self.session.begin():
-            query = select(ActiveDownload).where(ActiveDownload.imdb_id == imdb_id)
+            query = select(ActiveDownload).where(ActiveDownload.imdb_id == imdb_id)  # type: ignore
             results = await self.session.execute(query)
         return results.fetchone() is not None
 
@@ -26,8 +26,8 @@ class SqliteRequestRepo:
         async with self.session.begin():
             query = (
                 select(ActiveDownload)
-                .where(ActiveDownload.imdb_id == imdb_id)
-                .where(ActiveDownload.season == season)
+                .where(ActiveDownload.imdb_id == imdb_id)  # type: ignore
+                .where(ActiveDownload.season == season)  # type: ignore
             )
             results = await self.session.execute(query)
         return results.fetchone() is not None
@@ -36,9 +36,9 @@ class SqliteRequestRepo:
         async with self.session.begin():
             query = (
                 select(ActiveDownload)
-                .where(ActiveDownload.imdb_id == imdb_id)
-                .where(ActiveDownload.season == season)
-                .where(ActiveDownload.episode == episode)
+                .where(ActiveDownload.imdb_id == imdb_id)  # type: ignore
+                .where(ActiveDownload.season == season)  # type: ignore
+                .where(ActiveDownload.episode == episode)  # type: ignore
             )
             results = await self.session.execute(query)
         return results.fetchone() is not None

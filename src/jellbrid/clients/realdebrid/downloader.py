@@ -146,6 +146,9 @@ class RealDebridDownloader:
         return None
 
     async def download_episode(self, streams: list[Stream]):
+        if isinstance(self.request, (MovieRequest, SeasonRequest)):
+            raise Exception("Can't download episode for given request type")
+
         e_filter = functools.partial(
             episode_filter,
             season_id=self.request.season_id,

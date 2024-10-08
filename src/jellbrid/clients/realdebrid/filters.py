@@ -1,12 +1,3 @@
-from jellbrid.clients.realdebrid import RealDebridClient
-from jellbrid.clients.torrentio import Stream
-
-
-async def has_file_count(rdbc: RealDebridClient, s: Stream, count: int):
-    bundle = await rdbc.get_rd_bundle_with_file_count(s["infoHash"], count)
-    return True if bundle else False
-
-
 def episode_filter(name: str, season_id: int, episode_id: int):
     """This function can be used to filter RD bundles for cached torrents"""
 
@@ -23,6 +14,14 @@ def episode_filter(name: str, season_id: int, episode_id: int):
     if f"s{season_}.e{episode_}" in name:
         return True
     return False
+
+
+def movie_name_filter(filename: str, name: str) -> bool:
+    for word in name.split():
+        if word.lower() not in filename.lower():
+            return False
+
+    return True
 
 
 def filter_samples(filename: str):

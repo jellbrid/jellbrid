@@ -9,6 +9,7 @@ from jellbrid.clients.realdebrid.filters import (
     episode_filter,
     filter_extension,
     filter_samples,
+    movie_name_filter,
 )
 from jellbrid.clients.realdebrid.types import RDBundleFileFilter
 from jellbrid.clients.torrentio import Stream
@@ -68,22 +69,9 @@ class RealDebridDownloader:
         return results
 
     async def _find_bundle_with_file_count(
-        self, stream: Stream, count: int, *, use_episode_filter: bool = False
+        self, stream: Stream, count: int, *, filter: RDBundleFileFilter | None = None
     ):
-        if use_episode_filter:
-            if not isinstance(self.request, EpisodeRequest):
-                raise Exception(
-                    "Attempt to use episode filter on an unsupported Request"
-                )
-            e_filter = functools.partial(
-                episode_filter,
-                season_id=self.request.season_id,
-                episode_id=self.request.episode_id,
-            )
-            ffs = self.filters + [e_filter]
-        else:
-            ffs = self.filters
-
+        ffs = self.filters + [filter] if filter else self.filters
         cache = await self.rdbc.get_rd_bundle_with_file_count(
             stream["infoHash"], count, file_filters=ffs
         )
@@ -118,9 +106,13 @@ class RealDebridDownloader:
         if len(self.request.title) < 6:
             streams = self._filter_streams_with_release_year(streams)
 
+        movie_filter = functools.partial(movie_name_filter, name=self.request.title)
+
         for stream in streams:
             with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
-                bundle = await self._find_bundle_with_file_count(stream, 1)
+                bundle = await self._find_bundle_with_file_count(
+                    stream, 1, filter=movie_filter
+                )
                 if bundle is None:
                     continue
                 downloaded = await self._download(stream, bundle)
@@ -154,11 +146,16 @@ class RealDebridDownloader:
         return None
 
     async def download_episode(self, streams: list[Stream]):
+        e_filter = functools.partial(
+            episode_filter,
+            season_id=self.request.season_id,
+            episode_id=self.request.episode_id,
+        )
         # look for a single file that's instantly available
         for stream in streams:
             with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
                 bundle = await self._find_bundle_with_file_count(
-                    stream, 1, use_episode_filter=True
+                    stream, 1, filter=e_filter
                 )
                 if bundle is None:
                     continue

@@ -6,7 +6,11 @@ import structlog
 from jellbrid.clients.jellyfin import JellyfinClient, scan_and_wait_for_completion
 from jellbrid.clients.realdebrid import RealDebridClient, RealDebridDownloader
 from jellbrid.clients.seers import SeerrsClient, get_requests
-from jellbrid.clients.torrentio import QualityFilter, SortOrder, TorrentioClient
+from jellbrid.clients.torrentio import (
+    TorrentioClient,
+    get_streams_for_movie,
+    get_streams_for_show,
+)
 from jellbrid.config import Config
 from jellbrid.logging import setup_logging
 from jellbrid.requests import EpisodeRequest, MediaType, MovieRequest, SeasonRequest
@@ -112,17 +116,7 @@ async def handle_movie_request(
     async with sync.semaphore:
         logger.info("Starting request handler")
 
-        # Look for the highest quality, instantly available stream
-        if tc.is_older_media(request.release_year):
-            filter = QualityFilter.OLD
-            sort = SortOrder.SEEDERS
-        else:
-            filter = QualityFilter.HD
-            sort = SortOrder.QUALITY_THEN_SIZE
-
-        streams = await tc.get_movie_streams(
-            request.imdb_id, filter=filter, sort_order=sort
-        )
+        streams = await get_streams_for_movie(tc, request)
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
 
         downloaded = await rdd.download_movie(await rdd.instantly_available_streams)
@@ -156,17 +150,7 @@ async def handle_season_request(
     async with sync.semaphore:
         logger.info("Starting request handler")
 
-        if tc.is_older_media(request.release_year):
-            filter = QualityFilter.OLD
-            sort = SortOrder.SEEDERS
-        else:
-            filter = QualityFilter.HD
-            sort = SortOrder.QUALITY_THEN_SIZE
-
-        # first try to find a cached candidate with the full season
-        streams = await tc.get_show_streams(
-            request.imdb_id, request.season_id, 1, filter=filter, sort_order=sort
-        )
+        streams = await get_streams_for_show(tc, request)
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
         downloaded = await rdd.download_show(await rdd.instantly_available_streams)
         if downloaded is not None:
@@ -196,21 +180,7 @@ async def handle_episode_request(
     async with sync.semaphore:
         logger.info("Starting request handler")
 
-        if tc.is_older_media(request.release_year):
-            filter = QualityFilter.OLD
-            sort = SortOrder.SEEDERS
-        else:
-            filter = QualityFilter.HD
-            sort = SortOrder.QUALITY_THEN_SIZE
-
-        streams = await tc.get_show_streams(
-            request.imdb_id,
-            request.season_id,
-            request.episode_id,
-            filter=filter,
-            sort_order=sort,
-        )
-
+        streams = await get_streams_for_show(tc, request)
         # search for a cached torrent with just the episode we want
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
         downloaded = await rdd.download_episode(await rdd.instantly_available_streams)

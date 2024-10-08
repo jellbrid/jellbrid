@@ -1,0 +1,20 @@
+services:
+  jellbrid:
+    build: ./
+    image: jellbrid:latest
+    restart: always
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - JF_API_KEY=123
+      - JF_URL=http://localhost:8096
+      - SEERR_API_KEY=123
+      - SEERR_URL=http://localhost:5055
+      - RD_API_KEY=123
+      - RD_API_URL=https://api.real-debrid.com/rest/1.0/
+      - TORRENTIO_URL=https://torrentio.strem.fun
+      - JELLBRID_LOG_LEVEL=info
+    volumes:
+      - './test/:/root/.config/jellbrid'
+

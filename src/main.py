@@ -1,9 +1,7 @@
 import typing as t
 
 import anyio
-import cachetools
 import structlog
-from cachetools import Cache
 
 from jellbrid.clients.jellyfin import JellyfinClient, scan_and_wait_for_completion
 from jellbrid.clients.realdebrid import RealDebridClient, RealDebridDownloader
@@ -12,6 +10,7 @@ from jellbrid.clients.torrentio import QualityFilter, SortOrder, TorrentioClient
 from jellbrid.config import Config
 from jellbrid.logging import setup_logging
 from jellbrid.requests import EpisodeRequest, MediaType, MovieRequest, SeasonRequest
+from jellbrid.storage import ActiveDownload, SqliteRequestRepo, create_db, get_session
 
 logger = structlog.get_logger("jellbrid")
 
@@ -28,9 +27,9 @@ class Synchronizer:
 async def handler(
     cfg: Config,
     *,
+    repo: SqliteRequestRepo,
     rdbc: RealDebridClient,
     tc: TorrentioClient,
-    cache: Cache,
     tmdb_id: int | None = None,
 ):
     seers = SeerrsClient(cfg)
@@ -55,7 +54,7 @@ async def handler(
                             tc,
                             rdbc,
                             sync,
-                            cache,
+                            repo,
                         )
                     case MediaType.Season:
                         tg.start_soon(
@@ -64,7 +63,7 @@ async def handler(
                             tc,
                             rdbc,
                             sync,
-                            cache,
+                            repo,
                             True,
                         )
                     case MediaType.Episode:
@@ -74,11 +73,13 @@ async def handler(
                             tc,
                             rdbc,
                             sync,
-                            cache,
+                            repo,
                         )
                     case _:
                         logger.warning("Got unknown media type")
                 await anyio.sleep(1)
+
+    await update_active_downloads(rdbc, repo, sync)
 
     if sync.refresh.is_set():
         logger.info("Sleeping to give ZURG time to pickup new files")
@@ -102,10 +103,10 @@ async def handle_movie_request(
     tc: TorrentioClient,
     rdbc: RealDebridClient,
     sync: Synchronizer,
-    cache: Cache,
+    repo: SqliteRequestRepo,
 ):
-    if request.imdb_id in cache:
-        logger.debug("Ignoring cached request")
+    if await repo.has_movie(request.imdb_id):
+        logger.debug("Ignoring currently downloading movie")
         return
 
     async with sync.semaphore:
@@ -125,17 +126,16 @@ async def handle_movie_request(
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
 
         downloaded = await rdd.download_movie(await rdd.instantly_available_streams)
-        if downloaded:
+        if downloaded is not None:
             sync.refresh.set()
             return
 
         # Look for a the highest quality stream with many seeders
-        # only perform the search if we previously got any results at all
-        # TODO: remove cached streams from this, sort the streams ourselves
+        # TODO: sort the streams ourselves
         downloaded = await rdd.download_movie(await rdd.unavailable_streams)
-        if downloaded:
-            sync.refresh.set()
-            cache[request.imdb_id] = True
+        if downloaded is not None:
+            ad = ActiveDownload.from_movie_request(request, downloaded)
+            await repo.add(ad)
             return
 
         logger.info("Unable to find any matching torrents")
@@ -146,11 +146,11 @@ async def handle_season_request(
     tc: TorrentioClient,
     rdbc: RealDebridClient,
     sync: Synchronizer,
-    cache: Cache,
+    repo: SqliteRequestRepo,
     backoff_to_episodes: bool = False,
 ):
-    if request.imdb_id in cache:
-        logger.debug("Ignoring cached request")
+    if await repo.has_season(request.imdb_id, request.season_id):
+        logger.debug("Ignoring currently downloading season")
         return
 
     async with sync.semaphore:
@@ -167,10 +167,9 @@ async def handle_season_request(
         streams = await tc.get_show_streams(
             request.imdb_id, request.season_id, 1, filter=filter, sort_order=sort
         )
-
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
         downloaded = await rdd.download_show(await rdd.instantly_available_streams)
-        if downloaded:
+        if downloaded is not None:
             sync.refresh.set()
             return
 
@@ -180,7 +179,7 @@ async def handle_season_request(
         logger.info("Searching for individual episodes")
         for er in request.to_episode_requests():
             with structlog.contextvars.bound_contextvars(**er.ctx):
-                await handle_episode_request(er, tc, rdbc, sync, cache)
+                await handle_episode_request(er, tc, rdbc, sync, repo=repo)
 
 
 async def handle_episode_request(
@@ -188,11 +187,10 @@ async def handle_episode_request(
     tc: TorrentioClient,
     rdbc: RealDebridClient,
     sync: Synchronizer,
-    cache: Cache,
+    repo: SqliteRequestRepo,
 ):
-    cache_key = f"{request.imdb_id}:{request.season_id}:{request.episode_id}"
-    if cache_key in cache:
-        logger.debug("Ignoring cached request")
+    if await repo.has_episode(request.imdb_id, request.season_id, request.episode_id):
+        logger.debug("Ignoring currently downloading episode")
         return
 
     async with sync.semaphore:
@@ -216,7 +214,7 @@ async def handle_episode_request(
         # search for a cached torrent with just the episode we want
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
         downloaded = await rdd.download_episode(await rdd.instantly_available_streams)
-        if downloaded:
+        if downloaded is not None:
             sync.refresh.set()
             return
 
@@ -224,35 +222,49 @@ async def handle_episode_request(
         downloaded = await rdd.download_episode_from_bundle(
             await rdd.instantly_available_streams
         )
-        if downloaded:
-            sync.refresh.set()
-            cache[cache_key] = True
+        if downloaded is not None:
+            ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
+            await repo.add(ad)
             return
 
         # search for an uncached torrent with just the episode we want
         # TODO: sort the streams ourselves
         downloaded = await rdd.download_episode(await rdd.unavailable_streams)
-        if downloaded:
-            sync.refresh.set()
-            cache[cache_key] = True
+        if downloaded is not None:
+            ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
+            await repo.add(ad)
             return
 
         logger.info("Unable to find any matching torrents")
 
 
+async def update_active_downloads(
+    rdbc: RealDebridClient, repo: SqliteRequestRepo, sync: Synchronizer
+):
+    for request in await repo.get_requests():
+        info = await rdbc.get_torrent_files_info(request.torrent_id)
+        if info["progress"] == 100:
+            sync.refresh.set()
+            await repo.delete(request)
+        elif info["status"] in ("error", "dead"):
+            await repo.delete(request)
+
+
 async def runit(run_once: bool = True, tmdb_id: int | None = None):
     cfg = Config()
     setup_logging(cfg.jellbrid_log_level)
+    await create_db(cfg)
+
     if cfg.dev_mode:
         logger.warning("Running in dev-mode. Nothing will be downloaded")
 
     # make these here to persist caches across runs
     rdbc = RealDebridClient(cfg)
     tc = TorrentioClient(cfg)
-    cache = cachetools.TTLCache(100, 60 * 60)
+    repo = SqliteRequestRepo(get_session())
 
     while True:
-        await handler(cfg, rdbc=rdbc, tc=tc, cache=cache, tmdb_id=tmdb_id)
+        await handler(cfg, rdbc=rdbc, tc=tc, repo=repo, tmdb_id=tmdb_id)
         logger.info("Completed request processing")
         if run_once:
             break

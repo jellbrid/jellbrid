@@ -124,9 +124,9 @@ class RealDebridDownloader:
                 if bundle is None:
                     continue
                 downloaded = await self._download(stream, bundle)
-                if downloaded:
-                    return True
-        return False
+                if downloaded is not None:
+                    return downloaded
+        return None
 
     async def download_show(self, streams: list[Stream]):
         # this is probably unecessary for cached streams, but necessary for uncached
@@ -139,8 +139,8 @@ class RealDebridDownloader:
                 if bundle is None:
                     continue
                 downloaded = await self._download(stream, bundle)
-                if downloaded:
-                    return True
+                if downloaded is not None:
+                    return downloaded
 
         # try to find a bundle with any amount of files
         for stream in candidates:
@@ -149,9 +149,9 @@ class RealDebridDownloader:
                 if bundle is None:
                     continue
                 downloaded = await self._download(stream, bundle)
-                if downloaded:
-                    return True
-        return False
+                if downloaded is not None:
+                    return downloaded
+        return None
 
     async def download_episode(self, streams: list[Stream]):
         # look for a single file that's instantly available
@@ -164,11 +164,11 @@ class RealDebridDownloader:
                     continue
 
                 downloaded = await self._download(stream, bundle)
-                if downloaded:
-                    return True
-        return False
+                if downloaded is not None:
+                    return downloaded
+        return None
 
-    async def download_episode_from_bundle(self, streams: list[Stream]):
+    async def download_episode_from_bundle(self, streams: list[Stream]) -> str | None:
         for stream in streams:
             with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
                 bundle = await self._find_bundle_with_file(stream)
@@ -176,29 +176,31 @@ class RealDebridDownloader:
                     continue
 
                 downloaded = await self._download(stream, bundle)
-                if downloaded:
-                    return True
-        return False
+                if downloaded is not None:
+                    return downloaded
+        return None
 
-    async def _download(self, stream: Stream, bundle: RDBundle | TorrentBundle):
+    async def _download(
+        self, stream: Stream, bundle: RDBundle | TorrentBundle
+    ) -> str | None:
         if self.rdbc.cfg.dev_mode:
             logger.info(
                 "Skipped downloading torrent",
                 bundle=bundle.bundle if bundle else bundle,
             )
-            return True
+            return ""
 
         torrent = await self.rdbc.add_magnet(stream["infoHash"])
         torrent_id = torrent.get("id")
         if torrent_id is None:
             logger.warning("Unable to add magnet", **torrent)
-            return False
+            return None
 
         result = await self.rdbc.select_files(torrent["id"], bundle.file_ids)
         if "error" in result:
             logger.warning("Unable to start torrent", **result)
             result = await self.rdbc.delete_magnet(torrent_id)
-            return False
+            return None
 
         logger.info("Downloaded torrent")
-        return True
+        return torrent["id"]

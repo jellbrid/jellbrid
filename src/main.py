@@ -222,8 +222,8 @@ async def update_active_downloads(
 
 async def runit(run_once: bool = True, tmdb_id: int | None = None):
     cfg = Config()
-    setup_logging(cfg.jellbrid_log_level)
     await create_db(cfg)
+    setup_logging(cfg.jellbrid_log_level)
 
     if cfg.dev_mode:
         logger.warning("Running in dev-mode. Nothing will be downloaded")

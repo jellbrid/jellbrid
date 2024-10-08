@@ -29,7 +29,7 @@ class TorrentioClient:
 
     def is_older_media(self, release_year: str):
         release_year_ = int(release_year)
-        return (datetime.datetime.now().year - release_year_) > 15
+        return (datetime.datetime.now().year - release_year_) > 40
 
     def path_for_options(self, order: SortOrder, filter: QualityFilter) -> str:
         # path = f"sort={order.value}|qualityfilter={filter.value}|debridoptions=nodownloadlinks,nocatalog|realdebrid={self.rd_api_key}/stream"

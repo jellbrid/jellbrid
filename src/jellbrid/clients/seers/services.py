@@ -26,6 +26,7 @@ async def parse_request(
             imdb_id=details["imdbId"],
             tmdb_id=tmdb_id,
             release_date=details["releaseDate"],
+            alt_title=details["originalTitle"],
         )
         yield t.cast(MediaRequest, mr)
         return
@@ -81,6 +82,7 @@ async def parse_request(
         episodes = await sc.get_episodes_in_season(tmdb_id, season_id)
         sr = SeasonRequest(
             title=details["name"],
+            alt_title=details["originalName"],
             tmdb_id=tmdb_id,
             imdb_id=details["externalIds"]["imdbId"],
             season_id=season_id,
@@ -113,6 +115,7 @@ async def create_episode_requests(
     for episode in season_names_to_episodes.values():
         yield EpisodeRequest(
             title=show_info["name"],
+            alt_title=show_info["originalName"],
             episode_name=episode["name"],
             tmdb_id=tmdb_id,
             imdb_id=show_info["externalIds"]["imdbId"],

@@ -18,6 +18,7 @@ class MediaRequest:
     tmdb_id: int
     title: str
     release_date: str
+    alt_title: str | None = None
 
     @property
     def ctx(self) -> dict:

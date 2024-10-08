@@ -46,6 +46,7 @@ class SeerrMovieDetail(t.TypedDict):
     imdbId: str
     title: str
     releaseDate: str
+    originalTitle: str
 
 
 class ExternalIds(t.TypedDict):
@@ -58,6 +59,7 @@ class SeerrShowDetail(t.TypedDict):
     seasons: list["ShowDetailSeason"]
     mediaInfo: "SeerrMediaInfo"
     firstAirDate: str
+    originalName: str
 
 
 class ShowDetailSeason(t.TypedDict):

@@ -1,6 +1,7 @@
 import typing as t
 
 import anyio
+import cachetools
 import structlog
 
 from jellbrid.clients.jellyfin import JellyfinClient, scan_and_wait_for_completion
@@ -23,6 +24,7 @@ class Synchronizer:
     def __init__(self, cfg: Config):
         self.semaphore = anyio.Semaphore(cfg.n_parallel_requests)
         self.refresh = anyio.Event()
+        self.cache = cachetools.Cache(100)
 
     def reset(self):
         self.refresh = anyio.Event()
@@ -113,6 +115,11 @@ async def handle_movie_request(
         logger.debug("Ignoring currently downloading movie")
         return
 
+    cache_key = request.imdb_id
+    if cache_key in sync.cache:
+        logger.debug("Ignoring already handled movie request")
+        return
+
     async with sync.semaphore:
         logger.info("Starting request handler")
 
@@ -122,6 +129,7 @@ async def handle_movie_request(
         downloaded = await rdd.download_movie(await rdd.instantly_available_streams)
         if downloaded is not None:
             sync.refresh.set()
+            sync.cache[cache_key] = True
             return
 
         # Look for a the highest quality stream with many seeders
@@ -130,6 +138,7 @@ async def handle_movie_request(
         if downloaded is not None:
             ad = ActiveDownload.from_movie_request(request, downloaded)
             await repo.add(ad)
+            sync.cache[cache_key] = True
             return
 
         logger.info("Unable to find any matching torrents")
@@ -147,6 +156,11 @@ async def handle_season_request(
         logger.debug("Ignoring currently downloading season")
         return
 
+    cache_key = f"{request.imdb_id}-{request.season_id}"
+    if cache_key in sync.cache:
+        logger.debug("Ignoring already handled request for season")
+        return
+
     async with sync.semaphore:
         logger.info("Starting request handler")
 
@@ -155,6 +169,7 @@ async def handle_season_request(
         downloaded = await rdd.download_show(await rdd.instantly_available_streams)
         if downloaded is not None:
             sync.refresh.set()
+            sync.cache[cache_key] = True
             return
 
         logger.info("Unable to find any matching torrents")
@@ -177,6 +192,11 @@ async def handle_episode_request(
         logger.debug("Ignoring currently downloading episode")
         return
 
+    cache_key = f"{request.imdb_id}-{request.season_id}-{request.episode_id}"
+    if cache_key in sync.cache:
+        logger.debug("Ignoring already handled request for episode")
+        return
+
     async with sync.semaphore:
         logger.info("Starting request handler")
 
@@ -186,6 +206,7 @@ async def handle_episode_request(
         downloaded = await rdd.download_episode(await rdd.instantly_available_streams)
         if downloaded is not None:
             sync.refresh.set()
+            sync.cache[cache_key] = True
             return
 
         # search for the episode we want inside of a cached torrent
@@ -195,6 +216,7 @@ async def handle_episode_request(
         if downloaded is not None:
             ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
             await repo.add(ad)
+            sync.cache[cache_key] = True
             return
 
         # search for an uncached torrent with just the episode we want
@@ -203,6 +225,7 @@ async def handle_episode_request(
         if downloaded is not None:
             ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
             await repo.add(ad)
+            sync.cache[cache_key] = True
             return
 
         logger.info("Unable to find any matching torrents")

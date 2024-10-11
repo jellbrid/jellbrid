@@ -43,6 +43,8 @@ Install and then run it:
 `uv sync && uv run cli jellbrid`
 
 ### TODO
+- track requests to prevent duplicate downloads when JF doesn't immedediately
+  recognize media
 - auto remove redundant torrents
 - auto update files to 4k
 - accept webhooks from seerrs to start a DL (instead of? in addition to? polling)

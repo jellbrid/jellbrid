@@ -26,3 +26,5 @@ class Config:
         self.storage_dir = Path.home() / ".config/jellbrid"
         Path.mkdir(self.storage_dir, exist_ok=True)
         self.db = self.storage_dir / "jellbrid.db"
+
+        self.server_port = env.int("JELLBRID_SERVER_PORT", default=9090)

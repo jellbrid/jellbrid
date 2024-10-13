@@ -36,11 +36,11 @@ async def handler(
     repo: SqliteRequestRepo,
     rdbc: RealDebridClient,
     tc: TorrentioClient,
+    sync: Synchronizer,
     tmdb_id: int | None = None,
 ):
     seers = SeerrsClient(cfg)
     jc = JellyfinClient(cfg)
-    sync = Synchronizer(cfg)
 
     async with anyio.create_task_group() as tg:
         async for request in get_requests(seers, jc):
@@ -257,9 +257,10 @@ async def runit(run_once: bool = True, tmdb_id: int | None = None):
     rdbc = RealDebridClient(cfg)
     tc = TorrentioClient(cfg)
     repo = SqliteRequestRepo(get_session())
+    sync = Synchronizer(cfg)
 
     while True:
-        await handler(cfg, rdbc=rdbc, tc=tc, repo=repo, tmdb_id=tmdb_id)
+        await handler(cfg, rdbc=rdbc, tc=tc, repo=repo, sync=sync, tmdb_id=tmdb_id)
         logger.info("Completed request processing")
         if run_once:
             break

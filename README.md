@@ -43,8 +43,7 @@ Install and then run it:
 `uv sync && uv run cli jellbrid`
 
 ### TODO
-- track requests to prevent duplicate downloads when JF doesn't immedediately
-  recognize media
+
 - auto remove redundant torrents
 - auto update files to 4k
 - accept webhooks from seerrs to start a DL (instead of? in addition to? polling)
@@ -88,3 +87,5 @@ Install and then run it:
   - this could probably just be a task that iterates thru the cache contents and
     checks their status. deleting if the seeders is None. and then using a
     secondary cache to make that request unavailable for a while? - X
+- track requests to prevent duplicate downloads when JF doesn't immedediately
+  recognize media

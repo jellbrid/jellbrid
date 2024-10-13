@@ -1,5 +1,3 @@
-import typing as t
-
 import anyio
 import structlog
 
@@ -15,7 +13,6 @@ from jellbrid.config import Config
 from jellbrid.logging import setup_logging
 from jellbrid.requests import (
     EpisodeRequest,
-    MediaType,
     MovieRequest,
     RequestCache,
     SeasonRequest,
@@ -165,7 +162,6 @@ async def handle_season_request(
         logger.debug("Ignoring currently downloading season")
         return
 
-    cache_key = f"{request.imdb_id}-{request.season_id}"
     if rc.has_request(request):
         logger.debug("Ignoring already handled request for season")
         return
@@ -187,7 +183,7 @@ async def handle_season_request(
         logger.info("Searching for individual episodes")
         for er in request.to_episode_requests():
             with structlog.contextvars.bound_contextvars(**er.ctx):
-                await handle_episode_request(er, tc, rdbc, sync, repo=repo)
+                await handle_episode_request(er, tc, rdbc, sync, repo=repo, rc=rc)
 
 
 async def handle_episode_request(
@@ -202,8 +198,7 @@ async def handle_episode_request(
         logger.debug("Ignoring currently downloading episode")
         return
 
-    cache_key = f"{request.imdb_id}-{request.season_id}-{request.episode_id}"
-    if rc.has_request(request)
+    if rc.has_request(request):
         logger.debug("Ignoring already handled request for episode")
         return
 

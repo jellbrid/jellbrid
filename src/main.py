@@ -250,6 +250,8 @@ async def runit(run_once: bool = True, tmdb_id: int | None = None):
 
     if cfg.dev_mode:
         logger.warning("Running in dev-mode. Nothing will be downloaded")
+    else:
+        logger.info("Beginning processing loop")
 
     # make these here to persist caches across runs
     rdbc = RealDebridClient(cfg)
@@ -262,10 +264,6 @@ async def runit(run_once: bool = True, tmdb_id: int | None = None):
         if run_once:
             break
         await anyio.sleep(60)
-
-
-def main():
-    anyio.run(runit)
 
 
 if __name__ == "__main__":

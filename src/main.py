@@ -57,21 +57,21 @@ async def handler(
                     continue
                 if tmdb_id is not None and request.tmdb_id != tmdb_id:
                     continue
-                match request.type:
-                    case MediaType.Movie:
+                match request:
+                    case MovieRequest():
                         tg.start_soon(
                             handle_movie_request,
-                            t.cast(MovieRequest, request),
+                            request,
                             tc,
                             rdbc,
                             sync,
                             repo,
                             rc,
                         )
-                    case MediaType.Season:
+                    case SeasonRequest():
                         tg.start_soon(
                             handle_season_request,
-                            t.cast(SeasonRequest, request),
+                            request,
                             tc,
                             rdbc,
                             sync,
@@ -79,10 +79,10 @@ async def handler(
                             rc,
                             True,
                         )
-                    case MediaType.Episode:
+                    case EpisodeRequest():
                         tg.start_soon(
                             handle_episode_request,
-                            t.cast(EpisodeRequest, request),
+                            request,
                             tc,
                             rdbc,
                             sync,

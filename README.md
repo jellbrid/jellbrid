@@ -43,7 +43,8 @@ Install and then run it:
 `uv sync && uv run cli jellbrid`
 
 ### TODO
-
+- make repeat requests for JF / Jellyseerr lighter
+  - if it's lighter, we can loop more often than every 60 seconds
 - auto remove redundant torrents
 - auto update files to 4k
 - accept webhooks from seerrs to start a DL (instead of? in addition to? polling)

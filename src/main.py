@@ -1,7 +1,6 @@
 import typing as t
 
 import anyio
-import cachetools
 import structlog
 
 from jellbrid.clients.jellyfin import JellyfinClient, scan_and_wait_for_completion
@@ -14,7 +13,13 @@ from jellbrid.clients.torrentio import (
 )
 from jellbrid.config import Config
 from jellbrid.logging import setup_logging
-from jellbrid.requests import EpisodeRequest, MediaType, MovieRequest, SeasonRequest
+from jellbrid.requests import (
+    EpisodeRequest,
+    MediaType,
+    MovieRequest,
+    RequestCache,
+    SeasonRequest,
+)
 from jellbrid.storage import ActiveDownload, SqliteRequestRepo, create_db, get_session
 
 logger = structlog.get_logger("jellbrid")
@@ -24,7 +29,6 @@ class Synchronizer:
     def __init__(self, cfg: Config):
         self.semaphore = anyio.Semaphore(cfg.n_parallel_requests)
         self.refresh = anyio.Event()
-        self.cache = cachetools.Cache(100)
 
     def reset(self):
         self.refresh = anyio.Event()
@@ -37,6 +41,7 @@ async def handler(
     rdbc: RealDebridClient,
     tc: TorrentioClient,
     sync: Synchronizer,
+    rc: RequestCache,
     tmdb_id: int | None = None,
 ):
     seers = SeerrsClient(cfg)
@@ -61,6 +66,7 @@ async def handler(
                             rdbc,
                             sync,
                             repo,
+                            rc,
                         )
                     case MediaType.Season:
                         tg.start_soon(
@@ -70,6 +76,7 @@ async def handler(
                             rdbc,
                             sync,
                             repo,
+                            rc,
                             True,
                         )
                     case MediaType.Episode:
@@ -80,6 +87,7 @@ async def handler(
                             rdbc,
                             sync,
                             repo,
+                            rc,
                         )
                     case _:
                         logger.warning("Got unknown media type")
@@ -110,13 +118,13 @@ async def handle_movie_request(
     rdbc: RealDebridClient,
     sync: Synchronizer,
     repo: SqliteRequestRepo,
+    rc: RequestCache,
 ):
     if await repo.has_movie(request.imdb_id):
         logger.debug("Ignoring currently downloading movie")
         return
 
-    cache_key = request.imdb_id
-    if cache_key in sync.cache:
+    if rc.has_request(request):
         logger.debug("Ignoring already handled movie request")
         return
 
@@ -129,7 +137,7 @@ async def handle_movie_request(
         downloaded = await rdd.download_movie(await rdd.instantly_available_streams)
         if downloaded is not None:
             sync.refresh.set()
-            sync.cache[cache_key] = True
+            rc.add_request(request)
             return
 
         # Look for a the highest quality stream with many seeders
@@ -138,7 +146,7 @@ async def handle_movie_request(
         if downloaded is not None:
             ad = ActiveDownload.from_movie_request(request, downloaded)
             await repo.add(ad)
-            sync.cache[cache_key] = True
+            rc.add_request(request)
             return
 
         logger.info("Unable to find any matching torrents")
@@ -150,6 +158,7 @@ async def handle_season_request(
     rdbc: RealDebridClient,
     sync: Synchronizer,
     repo: SqliteRequestRepo,
+    rc: RequestCache,
     backoff_to_episodes: bool = False,
 ):
     if await repo.has_season(request.imdb_id, request.season_id):
@@ -157,7 +166,7 @@ async def handle_season_request(
         return
 
     cache_key = f"{request.imdb_id}-{request.season_id}"
-    if cache_key in sync.cache:
+    if rc.has_request(request):
         logger.debug("Ignoring already handled request for season")
         return
 
@@ -169,7 +178,7 @@ async def handle_season_request(
         downloaded = await rdd.download_show(await rdd.instantly_available_streams)
         if downloaded is not None:
             sync.refresh.set()
-            sync.cache[cache_key] = True
+            rc.add_request(request)
             return
 
         logger.info("Unable to find any matching torrents")
@@ -187,13 +196,14 @@ async def handle_episode_request(
     rdbc: RealDebridClient,
     sync: Synchronizer,
     repo: SqliteRequestRepo,
+    rc: RequestCache,
 ):
     if await repo.has_episode(request.imdb_id, request.season_id, request.episode_id):
         logger.debug("Ignoring currently downloading episode")
         return
 
     cache_key = f"{request.imdb_id}-{request.season_id}-{request.episode_id}"
-    if cache_key in sync.cache:
+    if rc.has_request(request)
         logger.debug("Ignoring already handled request for episode")
         return
 
@@ -206,7 +216,7 @@ async def handle_episode_request(
         downloaded = await rdd.download_episode(await rdd.instantly_available_streams)
         if downloaded is not None:
             sync.refresh.set()
-            sync.cache[cache_key] = True
+            rc.add_request(request)
             return
 
         # search for the episode we want inside of a cached torrent
@@ -216,7 +226,7 @@ async def handle_episode_request(
         if downloaded is not None:
             ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
             await repo.add(ad)
-            sync.cache[cache_key] = True
+            rc.add_request(request)
             return
 
         # search for an uncached torrent with just the episode we want
@@ -225,7 +235,7 @@ async def handle_episode_request(
         if downloaded is not None:
             ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
             await repo.add(ad)
-            sync.cache[cache_key] = True
+            rc.add_request(request)
             return
 
         logger.info("Unable to find any matching torrents")
@@ -258,9 +268,12 @@ async def runit(run_once: bool = True, tmdb_id: int | None = None):
     tc = TorrentioClient(cfg)
     repo = SqliteRequestRepo(get_session())
     sync = Synchronizer(cfg)
+    rc = RequestCache()
 
     while True:
-        await handler(cfg, rdbc=rdbc, tc=tc, repo=repo, sync=sync, tmdb_id=tmdb_id)
+        await handler(
+            cfg, rdbc=rdbc, tc=tc, repo=repo, sync=sync, rc=rc, tmdb_id=tmdb_id
+        )
         logger.info("Completed request processing")
         if run_once:
             break

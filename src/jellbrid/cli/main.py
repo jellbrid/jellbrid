@@ -23,5 +23,4 @@ async def jellbrid(
     loop: t.Annotated[bool, typer.Option("--loop")] = False,
     tmdb_id: int | None = None,
 ):
-    print("Running jellbrid CLI command")
     await runit(run_once=not loop, tmdb_id=tmdb_id)

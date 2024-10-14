@@ -30,5 +30,5 @@ def setup_logging(level: int):
     # disable other loggers
     for v in logging.Logger.manager.loggerDict.values():
         name = getattr(v, "name", "")
-        if not name.startswith("jelldebrid") and isinstance(v, logging.Logger):
+        if not name.startswith("jellbrid") and isinstance(v, logging.Logger):
             v.disabled = True

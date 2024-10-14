@@ -1,14 +1,18 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from jellbrid.config import Config
 from jellbrid.storage.active_dls import ActiveDownload
 
 
 class SqliteRequestRepo:
     def __init__(self, session: AsyncSession):
+        self.cfg = Config()
         self.session = session
 
     async def add(self, download: ActiveDownload):
+        if self.cfg.dev_mode:
+            return
         async with self.session.begin():
             self.session.add(download)
 

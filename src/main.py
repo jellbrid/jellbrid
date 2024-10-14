@@ -110,8 +110,8 @@ async def runit(loop: bool = True):
         tg.start_soon(run_receiver, receive_stream)
 
         if loop:
-            tg.start_soon(periodic_send, send_stream.clone(), "process", 300)
-            tg.start_soon(periodic_send, send_stream.clone(), "update", 300)
+            tg.start_soon(periodic_send, send_stream.clone(), "process", 60 * 5)
+            tg.start_soon(periodic_send, send_stream.clone(), "update", 60 * 5)
             tg.start_soon(start_server, send_stream.clone())
         else:
             async with send_stream:

@@ -43,11 +43,8 @@ Install and then run it:
 `uv sync && uv run cli jellbrid`
 
 ### TODO
-- make repeat requests for JF / Jellyseerr lighter
-  - if it's lighter, we can loop more often than every 60 seconds
 - auto remove redundant torrents
 - auto update files to 4k
-- accept webhooks from seerrs to start a DL (instead of? in addition to? polling)
 - make CTRL-C finish handling active requests
 - keep track of stats:
   # of torrentio requests per media request
@@ -90,3 +87,11 @@ Install and then run it:
     secondary cache to make that request unavailable for a while? - X
 - track requests to prevent duplicate downloads when JF doesn't immedediately
   recognize media
+- accept webhooks from seerrs to start a DL (instead of? in addition to?
+  polling)
+  - better integrate callback handler with primary loop (this will probably be
+    better long term)
+  - i.e. multiple requests will result in sqlalchemy.exc.ArgumentError: Class '<class 'jellbrid.storage.active_dls.ActiveDownload'>' already has a primary mapper defined.
+^Ccanceled 
+- make repeat requests for JF / Jellyseerr lighter
+  - if it's lighter, we can loop more often than every 60 seconds

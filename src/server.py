@@ -4,14 +4,13 @@ from hypercorn.config import Config as HypercornConfig
 from quart import Quart
 
 from jellbrid.config import Config
-from main import runit
 
 app = Quart(__name__)
 
 
 @app.post("/")
 async def new_request_received():
-    app.add_background_task(runit, run_once=True)
+    await app.send_stream.send("process")  # type: ignore
     return {"result": "ok"}
 
 

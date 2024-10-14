@@ -11,17 +11,14 @@
             "program": "./src/cli.py",
             "console": "integratedTerminal",
             "args": [
-                "seerrs",
-                "get-request",
-                "108"
-            ]
-        },
-        {
-            "name": "Python Debugger: main.py",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "./src/main.py",
-            "console": "integratedTerminal",
+                "jellbrid",
+                "--loop"
+                //"seerrs",
+                //"show-requests"
+            ],
+            "env": {
+                // "JELLBRID_TMDBID": "1064213"
+            }
         }
     ]
 }

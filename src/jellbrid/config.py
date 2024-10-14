@@ -28,3 +28,4 @@ class Config:
         self.db = self.storage_dir / "jellbrid.db"
 
         self.server_port = env.int("JELLBRID_SERVER_PORT", default=9090)
+        self.tmdb_id: int | None = env.int("JELLBRID_TMDBID", default=None)

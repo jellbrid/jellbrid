@@ -20,9 +20,7 @@ class Config:
             "JELLBRID_LOG_LEVEL", default=logging.DEBUG
         )
         self.dev_mode: bool = env.bool("DEV_MODE", default=True)
-        self.n_parallel_requests: int = env.int(
-            "N_PARALLEL_REQUESTS", default=1 if self.dev_mode else 3
-        )
+        self.n_parallel_requests: int = env.int("N_PARALLEL_REQUESTS", default=1)
         self.storage_dir = Path.home() / ".config/jellbrid"
         Path.mkdir(self.storage_dir, exist_ok=True)
         self.db = self.storage_dir / "jellbrid.db"

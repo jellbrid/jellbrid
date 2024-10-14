@@ -31,16 +31,16 @@ Create a `.env` file with the following contents:
 ```bash
 export JF_API_KEY=123
 export JF_URL=http://localhost:8096
-export SEERR_API_KEY=123
+export SEERR_API_KEY=456
 export SEERR_URL=http://localhost:5055
-export RD_API_KEY=123
+export RD_API_KEY=789
 export RD_API_URL=https://api.real-debrid.com/rest/1.0/
 export TORRENTIO_URL=https://torrentio.strem.fun
 export JELLBRID_LOG_LEVEL=info
 ```
 
 Install and then run it:
-`uv sync && uv run cli jellbrid`
+`uv sync && uv run cli jellbrid --loop`
 
 ### TODO
 - auto remove redundant torrents

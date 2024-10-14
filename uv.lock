@@ -439,6 +439,7 @@ dependencies = [
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "structlog" },
     { name = "tenacity" },
+    { name = "typer" },
 ]
 
 [package.dev-dependencies]
@@ -448,7 +449,6 @@ dev = [
     { name = "pytest" },
     { name = "rich" },
     { name = "ruff" },
-    { name = "typer" },
 ]
 
 [package.metadata]
@@ -465,6 +465,7 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.35" },
     { name = "structlog", specifier = ">=24.4.0" },
     { name = "tenacity", specifier = ">=9.0.0" },
+    { name = "typer", specifier = ">=0.12.5" },
 ]
 
 [package.metadata.requires-dev]
@@ -474,7 +475,6 @@ dev = [
     { name = "pytest", specifier = ">=8.3.3" },
     { name = "rich", specifier = ">=13.8.1" },
     { name = "ruff", specifier = ">=0.6.8" },
-    { name = "typer", specifier = ">=0.12.5" },
 ]
 
 [[package]]

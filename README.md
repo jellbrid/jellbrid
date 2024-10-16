@@ -6,11 +6,12 @@ Periodically reads media requests off of Jellyseerr, finds the requested media,
 and makes it available on Jellyfin.
 
 ## Features
+- Accepts request approval webhooks to instantly process new requests
 - Support for identifying and selecting instantly available media on
   Real-Debrid, this means that it typically takes the length of a Jellyfin scan
   to make new media available
 - Complete the gaps in your media requests with built in support for determining
-  which episodes are missing and finding only those
+  which episodes are missing and searching only for those
 - Automatically updates quality profiles depending on how old the requested
   media is
 - Automatically finds the highest quality media available
@@ -42,13 +43,19 @@ export JELLBRID_LOG_LEVEL=info
 Install and then run it:
 `uv sync && uv run cli jellbrid --loop`
 
+## Using webhooks
+
+On Jellyseerr, go to `Notifications` -> `Webhooks` and set Webhook URL to the
+address and port of your jellbrid server/container. It should look something
+like `http://jellbrid:9090`. Then select "Request Automatically Approved" and
+"Request Approved". 
+
 ### TODO
 - auto remove redundant torrents
 - auto update files to 4k
-- make CTRL-C finish handling active requests
 - keep track of stats:
-  # of torrentio requests per media request
-  # of of RD requests per media request
+  - number of torrentio requests per media request
+  - number of RD requests per media request
 - implement some sort of exponential backoff for requests that continuously just
   dont exist (like the looney toons seasons/episodes)
 - implement some sort of backoff for downloads that fail

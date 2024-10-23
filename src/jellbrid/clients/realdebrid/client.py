@@ -24,7 +24,7 @@ class RealDebridClient:
             url=cfg.rd_api_url, headers={"Authorization": f"Bearer {cfg.rd_api_key}"}
         )
         self.cfg = cfg
-        self.cache = TTLCache(maxsize=150, ttl=60 * 60)
+        self.cache = TTLCache(maxsize=200, ttl=60 * 60)
 
     async def get_instant_availability_data(
         self, hashes: list[str]

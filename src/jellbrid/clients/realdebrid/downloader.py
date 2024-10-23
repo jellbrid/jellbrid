@@ -109,7 +109,9 @@ class RealDebridDownloader:
         movie_filter = functools.partial(movie_name_filter, name=self.request.title)
 
         for stream in streams:
-            with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
+            with structlog.contextvars.bound_contextvars(
+                hash=stream["infoHash"], rdbc_cache_size=self.rdbc.cache.currsize
+            ):
                 bundle = await self._find_bundle_with_file_count(
                     stream, 1, filter=movie_filter
                 )

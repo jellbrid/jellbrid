@@ -17,8 +17,9 @@ def episode_filter(name: str, season_id: int, episode_id: int):
 
 
 def movie_name_filter(filename: str, name: str) -> bool:
-    for word in name.split():
-        if word.lower() not in filename.lower():
+    for word in name.lower().split():
+        word = word.strip(":")
+        if word not in filename.lower():
             return False
 
     return True

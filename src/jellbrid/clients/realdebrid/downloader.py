@@ -128,7 +128,9 @@ class RealDebridDownloader:
 
         # try to find a bundle with at least 80% of the files we want
         for stream in candidates:
-            with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
+            with structlog.contextvars.bound_contextvars(
+                hash=stream["infoHash"], rdbc_cache_size=self.rdbc.cache.currsize
+            ):
                 bundle = await self._find_bundle_with_file_ratio(stream, 0.8)
                 if bundle is None:
                     continue
@@ -158,7 +160,9 @@ class RealDebridDownloader:
         )
         # look for a single file that's instantly available
         for stream in streams:
-            with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
+            with structlog.contextvars.bound_contextvars(
+                hash=stream["infoHash"], rdbc_cache_size=self.rdbc.cache.currsize
+            ):
                 bundle = await self._find_bundle_with_file_count(
                     stream, 1, filter=e_filter
                 )

@@ -59,6 +59,8 @@ like `http://jellbrid:9090`. Then select "Request Automatically Approved" and
 - implement some sort of exponential backoff for requests that continuously just
   dont exist (like the looney toons seasons/episodes)
 - implement some sort of backoff for downloads that fail
+- implement a transparent, multitiered exponential backoff cache for requests
+  that repeatedly are unable to be fulfilled
 
 ### Done
 - implement uncached downloads by number of seeders - X

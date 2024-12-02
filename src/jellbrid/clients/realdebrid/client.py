@@ -164,9 +164,7 @@ class RealDebridClient:
         return rdc.get_bundle_with_match()
 
     async def _get_bundle_manager(
-        self,
-        hash,
-        file_filters: list[RDBundleFileFilter] | None = None,
+        self, hash: str, file_filters: list[RDBundleFileFilter] | None = None
     ):
         if await self.instantly_available(hash):
             data = await self.get_instant_availability_data([hash])

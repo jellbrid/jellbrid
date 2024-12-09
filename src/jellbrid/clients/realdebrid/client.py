@@ -104,6 +104,7 @@ class RealDebridClient:
         return await self.client.request("DELETE", f"torrents/delete/{id}")
 
     async def select_files(self, torrent_id: str, files: t.Iterable[str]) -> dict:
+        files = [str(f) for f in files]
         return await self.client.request(
             "POST",
             f"torrents/selectFiles/{torrent_id}",
@@ -166,9 +167,5 @@ class RealDebridClient:
     async def _get_bundle_manager(
         self, hash: str, file_filters: list[RDBundleFileFilter] | None = None
     ):
-        if await self.instantly_available(hash):
-            data = await self.get_instant_availability_data([hash])
-            data = data[hash].get("rd", [])
-        else:
-            data = await self.collect_data_from_uncached_torrent(hash)
+        data = await self.collect_data_from_uncached_torrent(hash)
         return RDBundleManager(data, file_filters=file_filters)

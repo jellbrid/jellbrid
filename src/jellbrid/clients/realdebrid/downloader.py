@@ -38,22 +38,6 @@ class RealDebridDownloader:
         self.filters = filters or []
         self.filters.extend((filter_samples, filter_extension))
 
-    @property
-    async def instantly_available_streams(self):
-        instantly_available_hashes = await self.rdbc.filter_instantly_available(
-            [s["infoHash"] for s in self.streams]
-        )
-        return [s for s in self.streams if s["infoHash"] in instantly_available_hashes]
-
-    @property
-    async def unavailable_streams(self):
-        instantly_available_hashes = await self.rdbc.filter_instantly_available(
-            [s["infoHash"] for s in self.streams]
-        )
-        return [
-            s for s in self.streams if s["infoHash"] not in instantly_available_hashes
-        ]
-
     def _filter_full_season_named_streams(self, streams: list[Stream]):
         results = []
         for stream in streams:
@@ -101,7 +85,8 @@ class RealDebridDownloader:
         )
         return bundle
 
-    async def download_movie(self, streams: list[Stream]):
+    async def download_movie(self):
+        streams = self.streams
         # try to get better results on movies with ambiguous titles
         if len(self.request.title) < 6:
             streams = self._filter_streams_with_release_year(streams)
@@ -122,8 +107,10 @@ class RealDebridDownloader:
                     return downloaded
         return None
 
-    async def download_show(self, streams: list[Stream]):
-        # this is probably unecessary for cached streams, but necessary for uncached
+    async def download_show(self):
+        # this is probably unecessary for cached streams, but necessary for
+        # uncached
+        streams = self.streams
         candidates = self._filter_full_season_named_streams(streams)
 
         # try to find a bundle with at least 80% of the files we want
@@ -149,7 +136,7 @@ class RealDebridDownloader:
                     return downloaded
         return None
 
-    async def download_episode(self, streams: list[Stream]):
+    async def download_episode(self):
         if isinstance(self.request, (MovieRequest, SeasonRequest)):
             raise Exception("Can't download episode for given request type")
 
@@ -159,7 +146,7 @@ class RealDebridDownloader:
             episode_id=self.request.episode_id,
         )
         # look for a single file that's instantly available
-        for stream in streams:
+        for stream in self.streams:
             with structlog.contextvars.bound_contextvars(
                 hash=stream["infoHash"], rdbc_cache_size=self.rdbc.cache.currsize
             ):
@@ -174,8 +161,8 @@ class RealDebridDownloader:
                     return downloaded
         return None
 
-    async def download_episode_from_bundle(self, streams: list[Stream]) -> str | None:
-        for stream in streams:
+    async def download_episode_from_bundle(self) -> str | None:
+        for stream in self.streams:
             with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
                 bundle = await self._find_bundle_with_file(stream)
                 if bundle is None:

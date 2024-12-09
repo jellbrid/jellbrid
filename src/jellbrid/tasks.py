@@ -60,7 +60,7 @@ async def handle_movie_request(
         streams = await get_streams_for_movie(tc, request)
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
 
-        downloaded = await rdd.download_movie(await rdd.instantly_available_streams)
+        downloaded = await rdd.download_movie()
         if downloaded is not None:
             sync.refresh.set()
             rc.add_request(request)
@@ -68,7 +68,7 @@ async def handle_movie_request(
 
         # Look for a the highest quality stream with many seeders
         # TODO: sort the streams ourselves
-        downloaded = await rdd.download_movie(await rdd.unavailable_streams)
+        downloaded = await rdd.download_movie()
         if downloaded is not None:
             ad = ActiveDownload.from_movie_request(request, downloaded)
             await repo.add(ad)
@@ -100,7 +100,7 @@ async def handle_season_request(
 
         streams = await get_streams_for_show(tc, request)
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
-        downloaded = await rdd.download_show(await rdd.instantly_available_streams)
+        downloaded = await rdd.download_show()
         if downloaded is not None:
             sync.refresh.set()
             rc.add_request(request)
@@ -137,16 +137,14 @@ async def handle_episode_request(
         streams = await get_streams_for_show(tc, request)
         # search for a cached torrent with just the episode we want
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
-        downloaded = await rdd.download_episode(await rdd.instantly_available_streams)
+        downloaded = await rdd.download_episode()
         if downloaded is not None:
             sync.refresh.set()
             rc.add_request(request)
             return
 
         # search for the episode we want inside of a cached torrent
-        downloaded = await rdd.download_episode_from_bundle(
-            await rdd.instantly_available_streams
-        )
+        downloaded = await rdd.download_episode_from_bundle()
         if downloaded is not None:
             ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
             await repo.add(ad)
@@ -155,7 +153,7 @@ async def handle_episode_request(
 
         # search for an uncached torrent with just the episode we want
         # TODO: sort the streams ourselves
-        downloaded = await rdd.download_episode(await rdd.unavailable_streams)
+        downloaded = await rdd.download_episode()
         if downloaded is not None:
             ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
             await repo.add(ad)

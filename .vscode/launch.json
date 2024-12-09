@@ -11,13 +11,11 @@
             "program": "./src/cli.py",
             "console": "integratedTerminal",
             "args": [
-                "jellbrid",
-                "--loop"
-                //"seerrs",
-                //"show-requests"
+                "jellbrid"
             ],
             "env": {
-                // "JELLBRID_TMDBID": "1064213"
+                "JELLBRID_TMDBID": "631843",
+                "DEV_MODE": "true"
             }
         }
     ]

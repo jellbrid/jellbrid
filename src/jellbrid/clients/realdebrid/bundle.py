@@ -93,7 +93,7 @@ class TorrentBundle:
 
     @property
     def size(self):
-        return len(self.bundle)
+        return len(self.filenames)
 
     @property
     def matches(self):

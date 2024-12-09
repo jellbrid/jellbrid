@@ -66,15 +66,6 @@ async def handle_movie_request(
             rc.add_request(request)
             return
 
-        # Look for a the highest quality stream with many seeders
-        # TODO: sort the streams ourselves
-        downloaded = await rdd.download_movie()
-        if downloaded is not None:
-            ad = ActiveDownload.from_movie_request(request, downloaded)
-            await repo.add(ad)
-            rc.add_request(request)
-            return
-
         logger.info("Unable to find any matching torrents")
 
 
@@ -145,15 +136,6 @@ async def handle_episode_request(
 
         # search for the episode we want inside of a cached torrent
         downloaded = await rdd.download_episode_from_bundle()
-        if downloaded is not None:
-            ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
-            await repo.add(ad)
-            rc.add_request(request)
-            return
-
-        # search for an uncached torrent with just the episode we want
-        # TODO: sort the streams ourselves
-        downloaded = await rdd.download_episode()
         if downloaded is not None:
             ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
             await repo.add(ad)

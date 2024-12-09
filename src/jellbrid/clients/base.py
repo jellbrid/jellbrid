@@ -44,6 +44,11 @@ class BaseClient:
         if response.status_code == 429:
             logger.warning("Performing a retry with exponential backoff")
             raise tenacity.TryAgain
+        if response.status_code >= 400:
+            logger.warning(
+                "Encountered terminal error. Attempting to continue",
+                error=response.json(),
+            )
 
         try:
             return response.json()

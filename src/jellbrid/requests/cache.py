@@ -4,6 +4,11 @@ from jellbrid.requests.main import EpisodeRequest, MovieRequest, SeasonRequest
 
 
 class RequestCache:
+    """
+    A cache for ensuring that requests are not infinitely processed if the media
+    library is unable to accurately identify the media
+    """
+
     def __init__(self, mazsize: int = 100) -> None:
         self.cache = Cache(maxsize=mazsize)
 

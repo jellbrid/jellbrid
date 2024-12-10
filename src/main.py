@@ -18,7 +18,6 @@ from jellbrid.tasks import (
     periodic_send,
     start_server,
     update_active_downloads,
-    update_media,
 )
 
 logger = structlog.get_logger("jellbrid")
@@ -98,7 +97,7 @@ async def run_receiver(r_stream: MemoryObjectReceiveStream):
                 if item == "process":
                     tg.start_soon(handle_requests, repo, rdbc, seerrs, jc, tc, sync, rc)
                 if item == "update":
-                    tg.start_soon(update_active_downloads, rdbc, repo, sync)
+                    tg.start_soon(update_active_downloads, rdbc, repo, sync, seerrs, jc)
 
 
 async def runit(loop: bool = True):

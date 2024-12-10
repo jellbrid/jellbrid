@@ -27,15 +27,25 @@ async def periodic_send(stream: MemoryObjectSendStream, message: str, period: in
 
 
 async def update_active_downloads(
-    rdbc: RealDebridClient, repo: SqliteRequestRepo, sync: Synchronizer
+    rdbc: RealDebridClient,
+    repo: SqliteRequestRepo,
+    sync: Synchronizer,
+    seerrs: SeerrsClient,
+    jc: JellyfinClient,
 ):
-    for request in await repo.get_requests():
-        info = await rdbc.get_torrent_files_info(request.torrent_id)
-        if info["progress"] == 100:
-            sync.refresh.set()
-            await repo.delete(request)
-        elif info["status"] in ("error", "dead"):
-            await repo.delete(request)
+    async with sync.processing_lock:
+        for request in await repo.get_requests():
+            info = await rdbc.get_torrent_files_info(request.torrent_id)
+            if info["progress"] == 100:
+                sync.refresh.set()
+                await repo.delete(request)
+            elif info["status"] in ("error", "dead"):
+                logger.warning("Unable to process torrent")
+                await repo.delete(request)
+
+        if sync.refresh.is_set():
+            await update_media(jc, seerrs)
+            sync.reset()
 
 
 async def handle_movie_request(
@@ -62,7 +72,8 @@ async def handle_movie_request(
 
         downloaded = await rdd.download_movie()
         if downloaded is not None:
-            sync.refresh.set()
+            ad = ActiveDownload.from_movie_request(request, downloaded)
+            await repo.add(ad)
             rc.add_request(request)
             return
 
@@ -93,7 +104,8 @@ async def handle_season_request(
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
         downloaded = await rdd.download_show()
         if downloaded is not None:
-            sync.refresh.set()
+            ad = ActiveDownload.from_season_request(request, downloaded)
+            await repo.add(ad)
             rc.add_request(request)
             return
 
@@ -126,18 +138,17 @@ async def handle_episode_request(
         logger.info("Starting request handler")
 
         streams = await get_streams_for_show(tc, request)
-        # search for a cached torrent with just the episode we want
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
-        downloaded = await rdd.download_episode()
-        if downloaded is not None:
-            sync.refresh.set()
-            rc.add_request(request)
-            return
 
-        # search for the episode we want inside of a cached torrent
-        downloaded = await rdd.download_episode_from_bundle()
+        # search for a cached torrent with just the episode we want
+        downloaded = await rdd.download_episode()
+
+        if downloaded is None:
+            # search for the episode we want inside of a cached torrent
+            downloaded = await rdd.download_episode_from_bundle()
+
         if downloaded is not None:
-            ad = ActiveDownload.from_episode_request(request, torrent_id=downloaded)
+            ad = ActiveDownload.from_episode_request(request, downloaded)
             await repo.add(ad)
             rc.add_request(request)
             return

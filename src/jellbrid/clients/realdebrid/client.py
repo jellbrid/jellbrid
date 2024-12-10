@@ -112,9 +112,13 @@ class RealDebridClient:
         )
 
     async def get_torrents(self, status: TorrentStatus | None = None):
-        results = await self.client.request("GET", "torrents")
-        if status:
-            return [r for r in results if r["status"] == status.value]
+        results = await self.client.request(
+            "GET",
+            "torrents",
+            params={
+                "filter": "active" if status == TorrentStatus.DOWNLOADING else None
+            },
+        )
         return results
 
     async def get_torrent_files_info(self, torrent_id: str) -> dict:

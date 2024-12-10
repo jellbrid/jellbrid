@@ -5,7 +5,7 @@ from hypercorn.asyncio import serve
 
 from jellbrid.clients.jellyfin import JellyfinClient, scan_and_wait_for_completion
 from jellbrid.clients.realdebrid import RealDebridClient, RealDebridDownloader
-from jellbrid.clients.seers import SeerrsClient
+from jellbrid.clients.seers import SeerrsClient, get_requests
 from jellbrid.clients.torrentio import (
     TorrentioClient,
     get_streams_for_movie,
@@ -20,32 +20,15 @@ from server import app, get_server_config
 logger = structlog.get_logger(__name__)
 
 
+async def start_server(send_stream: MemoryObjectSendStream):
+    app.send_stream = send_stream  # type:ignore
+    await serve(app, get_server_config())
+
+
 async def periodic_send(stream: MemoryObjectSendStream, message: str, period: int = 60):
     while True:
         await stream.send(message)
         await anyio.sleep(period)
-
-
-async def update_active_downloads(
-    rdbc: RealDebridClient,
-    repo: SqliteRequestRepo,
-    sync: Synchronizer,
-    seerrs: SeerrsClient,
-    jc: JellyfinClient,
-):
-    async with sync.processing_lock:
-        for request in await repo.get_requests():
-            info = await rdbc.get_torrent_files_info(request.torrent_id)
-            if info["progress"] == 100:
-                sync.refresh.set()
-                await repo.delete(request)
-            elif info["status"] in ("error", "dead"):
-                logger.warning("Unable to process torrent")
-                await repo.delete(request)
-
-        if sync.refresh.is_set():
-            await update_media(jc, seerrs)
-            sync.reset()
 
 
 async def handle_movie_request(
@@ -156,6 +139,28 @@ async def handle_episode_request(
         logger.info("Unable to find any matching torrents")
 
 
+async def update_active_downloads(
+    rdbc: RealDebridClient,
+    repo: SqliteRequestRepo,
+    sync: Synchronizer,
+    seerrs: SeerrsClient,
+    jc: JellyfinClient,
+):
+    async with sync.processing_lock:
+        for request in await repo.get_requests():
+            info = await rdbc.get_torrent_files_info(request.torrent_id)
+            if info["progress"] == 100:
+                sync.refresh.set()
+                await repo.delete(request)
+            elif info["status"] in ("error", "dead"):
+                logger.warning("Unable to process torrent")
+                await repo.delete(request)
+
+        if sync.refresh.is_set():
+            await update_media(jc, seerrs)
+            sync.reset()
+
+
 async def update_media(jc: JellyfinClient, seerrs: SeerrsClient):
     cfg = Config()
     logger.info("Sleeping to give ZURG time to pickup new files")
@@ -175,6 +180,56 @@ async def update_media(jc: JellyfinClient, seerrs: SeerrsClient):
         await anyio.sleep(10)
 
 
-async def start_server(send_stream: MemoryObjectSendStream):
-    app.send_stream = send_stream  # type:ignore
-    await serve(app, get_server_config())
+async def handle_requests(
+    repo: SqliteRequestRepo,
+    rdbc: RealDebridClient,
+    seerrs: SeerrsClient,
+    jc: JellyfinClient,
+    tc: TorrentioClient,
+    sync: Synchronizer,
+    rc: RequestCache,
+):
+    async with sync.processing_lock:
+        cfg = Config()
+        async with anyio.create_task_group() as tg:
+            async for request in get_requests(seerrs, jc):
+                with structlog.contextvars.bound_contextvars(
+                    **request.ctx, dev_mode=cfg.dev_mode
+                ):
+                    if request.imdb_id == "":
+                        logger.warning("Unable to find IMDB for request")
+                        continue
+                    if cfg.tmdb_id is not None and request.tmdb_id != cfg.tmdb_id:
+                        logger.debug("Skipping non-matching TMDB ID")
+                        continue
+                    match request:
+                        case MovieRequest():
+                            tg.start_soon(
+                                handle_movie_request, request, tc, rdbc, sync, repo, rc
+                            )
+                        case SeasonRequest():
+                            tg.start_soon(
+                                handle_season_request,
+                                request,
+                                tc,
+                                rdbc,
+                                sync,
+                                repo,
+                                rc,
+                                True,
+                            )
+                        case EpisodeRequest():
+                            tg.start_soon(
+                                handle_episode_request,
+                                request,
+                                tc,
+                                rdbc,
+                                sync,
+                                repo,
+                                rc,
+                            )
+                        case _:
+                            logger.warning("Got unknown media type")
+                    await anyio.sleep(1)
+
+    await update_active_downloads(rdbc, repo, sync, seerrs, jc)

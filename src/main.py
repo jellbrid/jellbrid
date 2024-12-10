@@ -4,78 +4,21 @@ from anyio.streams.memory import MemoryObjectReceiveStream
 
 from jellbrid.clients.jellyfin import JellyfinClient
 from jellbrid.clients.realdebrid import RealDebridClient
-from jellbrid.clients.seers import SeerrsClient, get_requests
+from jellbrid.clients.seers import SeerrsClient
 from jellbrid.clients.torrentio import TorrentioClient
 from jellbrid.config import Config
 from jellbrid.logging import setup_logging
-from jellbrid.requests import EpisodeRequest, MovieRequest, RequestCache, SeasonRequest
+from jellbrid.requests import RequestCache
 from jellbrid.storage import SqliteRequestRepo, create_db, get_session
 from jellbrid.sync import Synchronizer
 from jellbrid.tasks import (
-    handle_episode_request,
-    handle_movie_request,
-    handle_season_request,
+    handle_requests,
     periodic_send,
     start_server,
     update_active_downloads,
 )
 
 logger = structlog.get_logger("jellbrid")
-
-
-async def handle_requests(
-    repo: SqliteRequestRepo,
-    rdbc: RealDebridClient,
-    seerrs: SeerrsClient,
-    jc: JellyfinClient,
-    tc: TorrentioClient,
-    sync: Synchronizer,
-    rc: RequestCache,
-):
-    async with sync.processing_lock:
-        cfg = Config()
-        async with anyio.create_task_group() as tg:
-            async for request in get_requests(seerrs, jc):
-                with structlog.contextvars.bound_contextvars(
-                    **request.ctx, dev_mode=cfg.dev_mode
-                ):
-                    if request.imdb_id == "":
-                        logger.warning("Unable to find IMDB for request")
-                        continue
-                    if cfg.tmdb_id is not None and request.tmdb_id != cfg.tmdb_id:
-                        logger.debug("Skipping non-matching TMDB ID")
-                        continue
-                    match request:
-                        case MovieRequest():
-                            tg.start_soon(
-                                handle_movie_request, request, tc, rdbc, sync, repo, rc
-                            )
-                        case SeasonRequest():
-                            tg.start_soon(
-                                handle_season_request,
-                                request,
-                                tc,
-                                rdbc,
-                                sync,
-                                repo,
-                                rc,
-                                True,
-                            )
-                        case EpisodeRequest():
-                            tg.start_soon(
-                                handle_episode_request,
-                                request,
-                                tc,
-                                rdbc,
-                                sync,
-                                repo,
-                                rc,
-                            )
-                        case _:
-                            logger.warning("Got unknown media type")
-                    await anyio.sleep(1)
-
-    await update_active_downloads(rdbc, repo, sync, seerrs, jc)
 
 
 async def run_receiver(r_stream: MemoryObjectReceiveStream):

@@ -35,7 +35,6 @@ async def handle_requests(
 ):
     async with sync.processing_lock:
         cfg = Config()
-        logger.info("Starting request handling")
         async with anyio.create_task_group() as tg:
             async for request in get_requests(seerrs, jc):
                 with structlog.contextvars.bound_contextvars(
@@ -77,11 +76,7 @@ async def handle_requests(
                             logger.warning("Got unknown media type")
                     await anyio.sleep(1)
 
-        if sync.refresh.is_set():
-            await update_media(jc, seerrs)
-            sync.reset()
-
-        logger.info("Completed request handling")
+    await update_active_downloads(rdbc, repo, sync, seerrs, jc)
 
 
 async def run_receiver(r_stream: MemoryObjectReceiveStream):

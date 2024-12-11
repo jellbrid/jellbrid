@@ -14,6 +14,7 @@ from jellbrid.clients.realdebrid import (
 )
 from jellbrid.clients.seers import SeerrsClient, get_requests
 from jellbrid.clients.torrentio import (
+    Stream,
     TorrentioClient,
     get_streams_for_movie,
     get_streams_for_show,
@@ -59,9 +60,8 @@ async def handle_movie_request(
         logger.info("Starting request handler")
 
         streams = await get_streams_for_movie(tc, request)
-        rdd = RealDebridDownloader(
-            rdbc, hash_repo=hash_repo, request=request, streams=streams
-        )
+        streams = await filter_streams_with_bad_hashes(hash_repo, streams)
+        rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
 
         downloaded = await rdd.download_movie()
         if downloaded is not None:
@@ -95,9 +95,8 @@ async def handle_season_request(
         logger.info("Starting request handler")
 
         streams = await get_streams_for_show(tc, request)
-        rdd = RealDebridDownloader(
-            rdbc, hash_repo=hash_repo, request=request, streams=streams
-        )
+        streams = await filter_streams_with_bad_hashes(hash_repo, streams)
+        rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
         downloaded = await rdd.download_show()
         if downloaded is not None:
             ad = ActiveDownload.from_season_request(request, downloaded)
@@ -139,9 +138,8 @@ async def handle_episode_request(
         logger.info("Starting request handler")
 
         streams = await get_streams_for_show(tc, request)
-        rdd = RealDebridDownloader(
-            rdbc, hash_repo=hash_repo, request=request, streams=streams
-        )
+        streams = await filter_streams_with_bad_hashes(hash_repo, streams)
+        rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
 
         # search for a cached torrent with just the episode we want
         downloaded = await rdd.download_episode()
@@ -307,3 +305,14 @@ async def clear_stalled_downloads(
         await hash_repo.add(bad_hash)
         await dl_repo.delete_by_did(download["id"])
         await rdbc.delete_magnet(download["id"])
+
+
+async def filter_streams_with_bad_hashes(
+    hash_repo: BadHashRepo, streams: list[Stream]
+) -> list[Stream]:
+    result = []
+    for s in streams:
+        if hash_repo.has(s["infoHash"]):
+            continue
+        result.append(s)
+    return result

@@ -312,7 +312,7 @@ async def filter_streams_with_bad_hashes(
 ) -> list[Stream]:
     result = []
     for s in streams:
-        if hash_repo.has(s["infoHash"]):
+        if await hash_repo.has(s["infoHash"]):
             continue
         result.append(s)
     return result

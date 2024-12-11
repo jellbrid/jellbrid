@@ -98,7 +98,7 @@ class RealDebridDownloader:
 
         for stream in streams:
             hash = stream["infoHash"]
-            if self.hash_repo.has(hash):
+            if await self.hash_repo.has(hash):
                 continue
 
             with structlog.contextvars.bound_contextvars(
@@ -123,7 +123,7 @@ class RealDebridDownloader:
         # try to find a bundle with at least 80% of the files we want
         for stream in candidates:
             hash = stream["infoHash"]
-            if self.hash_repo.has(hash):
+            if await self.hash_repo.has(hash):
                 continue
 
             with structlog.contextvars.bound_contextvars(
@@ -159,7 +159,7 @@ class RealDebridDownloader:
         # look for a single file that's instantly available
         for stream in self.streams:
             hash = stream["infoHash"]
-            if self.hash_repo.has(hash):
+            if await self.hash_repo.has(hash):
                 continue
 
             with structlog.contextvars.bound_contextvars(
@@ -179,7 +179,7 @@ class RealDebridDownloader:
     async def download_episode_from_bundle(self) -> str | None:
         for stream in self.streams:
             hash = stream["infoHash"]
-            if self.hash_repo.has(hash):
+            if await self.hash_repo.has(hash):
                 continue
 
             with structlog.contextvars.bound_contextvars(hash=hash):

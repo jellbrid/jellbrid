@@ -50,6 +50,11 @@ address and port of your jellbrid server/container. It should look something
 like `http://jellbrid:9090`. Then select "Request Automatically Approved" and
 "Request Approved". 
 
+## Dev
+
+To run alembic:
+uv run alembic --config ./src/jellbrid/storage/alembic/alembic.ini
+
 ### TODO
 - auto remove redundant torrents
 - auto update files to 4k

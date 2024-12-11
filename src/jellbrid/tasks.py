@@ -1,10 +1,17 @@
+import datetime
+
 import anyio
 import structlog
 from anyio.streams.memory import MemoryObjectSendStream
 from hypercorn.asyncio import serve
+from zoneinfo import ZoneInfo
 
 from jellbrid.clients.jellyfin import JellyfinClient, scan_and_wait_for_completion
-from jellbrid.clients.realdebrid import RealDebridClient, RealDebridDownloader
+from jellbrid.clients.realdebrid import (
+    RealDebridClient,
+    RealDebridDownloader,
+    TorrentStatus,
+)
 from jellbrid.clients.seers import SeerrsClient, get_requests
 from jellbrid.clients.torrentio import (
     TorrentioClient,
@@ -13,7 +20,7 @@ from jellbrid.clients.torrentio import (
 )
 from jellbrid.config import Config
 from jellbrid.requests import EpisodeRequest, MovieRequest, RequestCache, SeasonRequest
-from jellbrid.storage import ActiveDownload, SqliteRequestRepo
+from jellbrid.storage import ActiveDownload, ActiveDownloadRepo, BadHash, BadHashRepo
 from jellbrid.sync import Synchronizer
 from server import app, get_server_config
 
@@ -36,7 +43,7 @@ async def handle_movie_request(
     tc: TorrentioClient,
     rdbc: RealDebridClient,
     sync: Synchronizer,
-    repo: SqliteRequestRepo,
+    repo: ActiveDownloadRepo,
     rc: RequestCache,
 ):
     if await repo.has_movie(request.imdb_id):
@@ -68,7 +75,7 @@ async def handle_season_request(
     tc: TorrentioClient,
     rdbc: RealDebridClient,
     sync: Synchronizer,
-    repo: SqliteRequestRepo,
+    repo: ActiveDownloadRepo,
     rc: RequestCache,
     backoff_to_episodes: bool = False,
 ):
@@ -106,7 +113,7 @@ async def handle_episode_request(
     tc: TorrentioClient,
     rdbc: RealDebridClient,
     sync: Synchronizer,
-    repo: SqliteRequestRepo,
+    repo: ActiveDownloadRepo,
     rc: RequestCache,
 ):
     if await repo.has_episode(request.imdb_id, request.season_id, request.episode_id):
@@ -141,7 +148,7 @@ async def handle_episode_request(
 
 async def update_active_downloads(
     rdbc: RealDebridClient,
-    repo: SqliteRequestRepo,
+    repo: ActiveDownloadRepo,
     sync: Synchronizer,
     seerrs: SeerrsClient,
     jc: JellyfinClient,
@@ -181,7 +188,7 @@ async def update_media(jc: JellyfinClient, seerrs: SeerrsClient):
 
 
 async def handle_requests(
-    repo: SqliteRequestRepo,
+    repo: ActiveDownloadRepo,
     rdbc: RealDebridClient,
     seerrs: SeerrsClient,
     jc: JellyfinClient,
@@ -233,3 +240,47 @@ async def handle_requests(
                     await anyio.sleep(1)
 
     await update_active_downloads(rdbc, repo, sync, seerrs, jc)
+
+
+async def clear_stalled_downloads(
+    rdbc: RealDebridClient,
+    dl_repo: ActiveDownloadRepo,
+    hash_repo: BadHashRepo,
+    limit_hrs: int = 3,
+):
+    """
+    Read active downloads and remove any that have been active for more than
+    limit_hrs. This will track the problematic hash, and clear the download from
+    RD and the internal download tracker
+    """
+    logger.info("Checking for stalled downloads")
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    limit_seconds = limit_hrs * 60 * 60
+    active_downloads = await rdbc.get_torrents(status=TorrentStatus.DOWNLOADING)
+
+    for download in active_downloads:
+        # update the timezone to be accurate...
+        added_at = download["added"].strip("Z")
+        dt = datetime.datetime.fromisoformat(added_at).replace(
+            tzinfo=ZoneInfo("Europe/Paris")
+        )
+        if (now - dt).total_seconds() < limit_seconds:
+            continue
+
+        logger.info(
+            f"Deleting stalled download older than {limit_hrs}hr(s)",
+            id=download["id"],
+            hash=download["hash"],
+            added_at=str(dt),
+        )
+
+        bad_hash = BadHash(
+            hash=download["hash"],
+            filename=download["filename"],
+            progress=download["progress"],
+            status=download["status"],
+        )
+        await hash_repo.add(bad_hash)
+        await dl_repo.delete_by_did(download["id"])
+        await rdbc.delete_magnet(download["id"])

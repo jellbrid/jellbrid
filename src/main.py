@@ -9,7 +9,7 @@ from jellbrid.clients.torrentio import TorrentioClient
 from jellbrid.config import Config
 from jellbrid.logging import setup_logging
 from jellbrid.requests import RequestCache
-from jellbrid.storage import SqliteRequestRepo, create_db, get_session
+from jellbrid.storage import ActiveDownloadRepo, create_db, get_session
 from jellbrid.sync import Synchronizer
 from jellbrid.tasks import (
     handle_requests,
@@ -30,7 +30,7 @@ async def run_receiver(r_stream: MemoryObjectReceiveStream):
     tc = TorrentioClient(cfg)
     seerrs = SeerrsClient(cfg)
     jc = JellyfinClient(cfg)
-    repo = SqliteRequestRepo(get_session())
+    repo = ActiveDownloadRepo(get_session())
     sync = Synchronizer(cfg)
     rc = RequestCache()
 

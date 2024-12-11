@@ -1,11 +1,11 @@
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from jellbrid.config import Config
 from jellbrid.storage.active_dls import ActiveDownload
 
 
-class SqliteRequestRepo:
+class ActiveDownloadRepo:
     def __init__(self, session: AsyncSession):
         self.cfg = Config()
         self.session = session
@@ -52,3 +52,15 @@ class SqliteRequestRepo:
             query = select(ActiveDownload)
             results = await self.session.scalars(query)
         return results.all()
+
+    async def get_by_did(self, did: str) -> ActiveDownload | None:
+        async with self.session.begin():
+            query = (
+                select(ActiveDownload).where(ActiveDownload.torrent_id == did)  # type: ignore
+            )
+            return await self.session.scalar(query)
+
+    async def delete_by_did(self, did: str) -> None:
+        async with self.session.begin():
+            query = delete(ActiveDownload).where(ActiveDownload.torrent_id == did)  # type: ignore
+            await self.session.execute(query)

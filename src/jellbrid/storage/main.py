@@ -1,9 +1,10 @@
-from sqlalchemy import Column, DateTime, Integer, String, Table
+from sqlalchemy import Column, DateTime, Float, Integer, String, Table
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import registry
 
 from jellbrid.config import Config
 from jellbrid.storage.active_dls import ActiveDownload
+from jellbrid.storage.bad_hashes import BadHash
 
 engine = None
 mapper_registry = registry()
@@ -22,12 +23,15 @@ async def create_db(cfg: Config):
     engine = create_async_engine(f"sqlite+aiosqlite:///{cfg.db}")
     async with engine.begin() as conn:
         await conn.run_sync(mapper_registry.metadata.create_all)
+        await conn.exec_driver_sql("PRAGMA journal_mode = WAL")
+        await conn.exec_driver_sql("PRAGMA busy_timeout = 5000")
 
     start_mappers()
 
 
 def start_mappers():
     mapper_registry.map_imperatively(ActiveDownload, active_downloads)
+    mapper_registry.map_imperatively(BadHash, bad_hashes)
 
 
 active_downloads = Table(
@@ -41,4 +45,15 @@ active_downloads = Table(
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("season", Integer, nullable=True),
     Column("episode", Integer, nullable=True),
+)
+
+bad_hashes = Table(
+    "bad_hashes",
+    mapper_registry.metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("hash", String(255), nullable=False, index=True),
+    Column("filename", String(255), nullable=False),
+    Column("status", String(526)),
+    Column("progress", Float),
+    Column("created_at", DateTime(timezone=True), nullable=False),
 )

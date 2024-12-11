@@ -18,6 +18,7 @@ from jellbrid.clients.torrentio.filters import (
     name_contains_release_year,
 )
 from jellbrid.requests import EpisodeRequest, MovieRequest, SeasonRequest
+from jellbrid.storage.hash_repo import BadHashRepo
 
 logger = structlog.get_logger(__name__)
 
@@ -27,6 +28,7 @@ class RealDebridDownloader:
         self,
         rdbc: RealDebridClient,
         *,
+        hash_repo: BadHashRepo,
         request: SeasonRequest | EpisodeRequest | MovieRequest,
         streams: list[Stream],
         filters: list[RDBundleFileFilter] | None = None,
@@ -34,6 +36,7 @@ class RealDebridDownloader:
         self.rdbc = rdbc
         self.streams = streams
         self.request = request
+        self.hash_repo = hash_repo
 
         self.filters = filters or []
         self.filters.extend((filter_samples, filter_extension))
@@ -94,8 +97,12 @@ class RealDebridDownloader:
         movie_filter = functools.partial(movie_name_filter, name=self.request.title)
 
         for stream in streams:
+            hash = stream["infoHash"]
+            if self.hash_repo.has(hash):
+                continue
+
             with structlog.contextvars.bound_contextvars(
-                hash=stream["infoHash"], rdbc_cache_size=self.rdbc.cache.currsize
+                hash=hash, rdbc_cache_size=self.rdbc.cache.currsize
             ):
                 bundle = await self._find_bundle_with_file_count(
                     stream, 1, filter=movie_filter
@@ -115,8 +122,12 @@ class RealDebridDownloader:
 
         # try to find a bundle with at least 80% of the files we want
         for stream in candidates:
+            hash = stream["infoHash"]
+            if self.hash_repo.has(hash):
+                continue
+
             with structlog.contextvars.bound_contextvars(
-                hash=stream["infoHash"], rdbc_cache_size=self.rdbc.cache.currsize
+                hash=hash, rdbc_cache_size=self.rdbc.cache.currsize
             ):
                 bundle = await self._find_bundle_with_file_ratio(stream, 0.8)
                 if bundle is None:
@@ -147,8 +158,12 @@ class RealDebridDownloader:
         )
         # look for a single file that's instantly available
         for stream in self.streams:
+            hash = stream["infoHash"]
+            if self.hash_repo.has(hash):
+                continue
+
             with structlog.contextvars.bound_contextvars(
-                hash=stream["infoHash"], rdbc_cache_size=self.rdbc.cache.currsize
+                hash=hash, rdbc_cache_size=self.rdbc.cache.currsize
             ):
                 bundle = await self._find_bundle_with_file_count(
                     stream, 1, filter=e_filter
@@ -163,7 +178,11 @@ class RealDebridDownloader:
 
     async def download_episode_from_bundle(self) -> str | None:
         for stream in self.streams:
-            with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
+            hash = stream["infoHash"]
+            if self.hash_repo.has(hash):
+                continue
+
+            with structlog.contextvars.bound_contextvars(hash=hash):
                 bundle = await self._find_bundle_with_file(stream)
                 if bundle is None:
                     continue

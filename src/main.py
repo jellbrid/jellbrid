@@ -41,7 +41,15 @@ async def run_receiver(r_stream: MemoryObjectReceiveStream):
             async for item in r_stream:
                 if item == "process":
                     tg.start_soon(
-                        handle_requests, dl_repo, rdbc, seerrs, jc, tc, sync, rc
+                        handle_requests,
+                        dl_repo,
+                        hash_repo,
+                        rdbc,
+                        seerrs,
+                        jc,
+                        tc,
+                        sync,
+                        rc,
                     )
                 if item == "update":
                     tg.start_soon(

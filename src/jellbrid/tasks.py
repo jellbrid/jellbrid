@@ -43,10 +43,11 @@ async def handle_movie_request(
     tc: TorrentioClient,
     rdbc: RealDebridClient,
     sync: Synchronizer,
-    repo: ActiveDownloadRepo,
+    dl_repo: ActiveDownloadRepo,
+    hash_repo: BadHashRepo,
     rc: RequestCache,
 ):
-    if await repo.has_movie(request.imdb_id):
+    if await dl_repo.has_movie(request.imdb_id):
         logger.debug("Ignoring currently downloading movie")
         return
 
@@ -58,12 +59,14 @@ async def handle_movie_request(
         logger.info("Starting request handler")
 
         streams = await get_streams_for_movie(tc, request)
-        rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
+        rdd = RealDebridDownloader(
+            rdbc, hash_repo=hash_repo, request=request, streams=streams
+        )
 
         downloaded = await rdd.download_movie()
         if downloaded is not None:
             ad = ActiveDownload.from_movie_request(request, downloaded)
-            await repo.add(ad)
+            await dl_repo.add(ad)
             rc.add_request(request)
             return
 
@@ -75,11 +78,12 @@ async def handle_season_request(
     tc: TorrentioClient,
     rdbc: RealDebridClient,
     sync: Synchronizer,
-    repo: ActiveDownloadRepo,
+    dl_repo: ActiveDownloadRepo,
+    hash_repo: BadHashRepo,
     rc: RequestCache,
     backoff_to_episodes: bool = False,
 ):
-    if await repo.has_season(request.imdb_id, request.season_id):
+    if await dl_repo.has_season(request.imdb_id, request.season_id):
         logger.debug("Ignoring currently downloading season")
         return
 
@@ -91,11 +95,13 @@ async def handle_season_request(
         logger.info("Starting request handler")
 
         streams = await get_streams_for_show(tc, request)
-        rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
+        rdd = RealDebridDownloader(
+            rdbc, hash_repo=hash_repo, request=request, streams=streams
+        )
         downloaded = await rdd.download_show()
         if downloaded is not None:
             ad = ActiveDownload.from_season_request(request, downloaded)
-            await repo.add(ad)
+            await dl_repo.add(ad)
             rc.add_request(request)
             return
 
@@ -105,7 +111,9 @@ async def handle_season_request(
         logger.info("Searching for individual episodes")
         for er in request.to_episode_requests():
             with structlog.contextvars.bound_contextvars(**er.ctx):
-                await handle_episode_request(er, tc, rdbc, sync, repo=repo, rc=rc)
+                await handle_episode_request(
+                    er, tc, rdbc, sync, dl_repo=dl_repo, hash_repo=hash_repo, rc=rc
+                )
 
 
 async def handle_episode_request(
@@ -113,10 +121,13 @@ async def handle_episode_request(
     tc: TorrentioClient,
     rdbc: RealDebridClient,
     sync: Synchronizer,
-    repo: ActiveDownloadRepo,
+    dl_repo: ActiveDownloadRepo,
+    hash_repo: BadHashRepo,
     rc: RequestCache,
 ):
-    if await repo.has_episode(request.imdb_id, request.season_id, request.episode_id):
+    if await dl_repo.has_episode(
+        request.imdb_id, request.season_id, request.episode_id
+    ):
         logger.debug("Ignoring currently downloading episode")
         return
 
@@ -128,7 +139,9 @@ async def handle_episode_request(
         logger.info("Starting request handler")
 
         streams = await get_streams_for_show(tc, request)
-        rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
+        rdd = RealDebridDownloader(
+            rdbc, hash_repo=hash_repo, request=request, streams=streams
+        )
 
         # search for a cached torrent with just the episode we want
         downloaded = await rdd.download_episode()
@@ -139,7 +152,7 @@ async def handle_episode_request(
 
         if downloaded is not None:
             ad = ActiveDownload.from_episode_request(request, downloaded)
-            await repo.add(ad)
+            await dl_repo.add(ad)
             rc.add_request(request)
             return
 
@@ -188,7 +201,8 @@ async def update_media(jc: JellyfinClient, seerrs: SeerrsClient):
 
 
 async def handle_requests(
-    repo: ActiveDownloadRepo,
+    dl_repo: ActiveDownloadRepo,
+    hash_repo: BadHashRepo,
     rdbc: RealDebridClient,
     seerrs: SeerrsClient,
     jc: JellyfinClient,
@@ -212,7 +226,14 @@ async def handle_requests(
                     match request:
                         case MovieRequest():
                             tg.start_soon(
-                                handle_movie_request, request, tc, rdbc, sync, repo, rc
+                                handle_movie_request,
+                                request,
+                                tc,
+                                rdbc,
+                                sync,
+                                dl_repo,
+                                hash_repo,
+                                rc,
                             )
                         case SeasonRequest():
                             tg.start_soon(
@@ -221,7 +242,8 @@ async def handle_requests(
                                 tc,
                                 rdbc,
                                 sync,
-                                repo,
+                                dl_repo,
+                                hash_repo,
                                 rc,
                                 True,
                             )
@@ -232,14 +254,15 @@ async def handle_requests(
                                 tc,
                                 rdbc,
                                 sync,
-                                repo,
+                                dl_repo,
+                                hash_repo,
                                 rc,
                             )
                         case _:
                             logger.warning("Got unknown media type")
                     await anyio.sleep(1)
 
-    await update_active_downloads(rdbc, repo, sync, seerrs, jc)
+    await update_active_downloads(rdbc, dl_repo, sync, seerrs, jc)
 
 
 async def clear_stalled_downloads(

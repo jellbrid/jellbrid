@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from jellbrid.config import Config
@@ -14,3 +15,9 @@ class BadHashRepo:
             return
         async with self.session.begin():
             self.session.add(hash)
+
+    async def has(self, hash: str):
+        async with self.session.begin():
+            query = select(BadHash).where(BadHash.hash == hash)  # type: ignore
+            results = await self.session.execute(query)
+        return results.fetchone() is not None

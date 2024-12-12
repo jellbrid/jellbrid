@@ -1,5 +1,15 @@
+from pathlib import Path
+
+import anyio
+import anyio.to_thread
+from alembic import command
+from alembic.config import Config as AlembicConfig
 from sqlalchemy import Column, DateTime, Float, Integer, String, Table
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import registry
 
 from jellbrid.config import Config
@@ -25,8 +35,15 @@ async def create_db(cfg: Config):
         await conn.run_sync(mapper_registry.metadata.create_all)
         await conn.exec_driver_sql("PRAGMA journal_mode = WAL")
         await conn.exec_driver_sql("PRAGMA busy_timeout = 5000")
+        await run_migrations()
 
     start_mappers()
+
+
+async def run_migrations():
+    config_file = Path(__file__).parent / Path("alembic/alembic.ini")
+    acfg = AlembicConfig(config_file)
+    await anyio.to_thread.run_sync(command.upgrade, acfg, "head")
 
 
 def start_mappers():

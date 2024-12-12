@@ -25,6 +25,7 @@ def setup_logging(level: int):
         format="%(message)s",
         stream=sys.stderr,
         level=level,
+        force=True,
     )
 
     # disable other loggers

@@ -1,7 +1,10 @@
 import asyncio
+from collections.abc import Iterable
 from logging.config import fileConfig
 
 from alembic import context
+from alembic.environment import MigrationContext
+from alembic.operations import MigrationScript
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
@@ -53,10 +56,27 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        process_revision_directives=process_revision_directives,
+    )
 
     with context.begin_transaction():
         context.run_migrations()
+
+
+def process_revision_directives(
+    context: MigrationContext,
+    revision: str | Iterable[str | None] | Iterable[str],
+    directives: list[MigrationScript],
+):
+    assert config.cmd_opts is not None
+    if getattr(config.cmd_opts, "autogenerate", False):
+        script = directives[0]
+        assert script.upgrade_ops is not None
+        if script.upgrade_ops.is_empty():
+            directives[:] = []
 
 
 async def run_async_migrations() -> None:

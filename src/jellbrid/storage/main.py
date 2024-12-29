@@ -4,7 +4,7 @@ import anyio
 import anyio.to_thread
 from alembic import command
 from alembic.config import Config as AlembicConfig
-from sqlalchemy import Column, DateTime, Float, Integer, String, Table
+from sqlalchemy import Column, DateTime, Float, Integer, MetaData, String, Table
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -16,8 +16,19 @@ from jellbrid.config import Config
 from jellbrid.storage.active_dls import ActiveDownload
 from jellbrid.storage.bad_hashes import BadHash
 
+meta = MetaData(
+    naming_convention={
+        "ix": "ix_%(column_0_label)s",
+        "uq": "uq_%(table_name)s_%(column_0_name)s",
+        "ck": "ck_%(table_name)s_%(constraint_name)s",
+        "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+        "pk": "pk_%(table_name)s",
+    }
+)
+
+
 engine = None
-mapper_registry = registry()
+mapper_registry = registry(metadata=meta)
 
 
 def get_session_maker() -> async_sessionmaker[AsyncSession]:

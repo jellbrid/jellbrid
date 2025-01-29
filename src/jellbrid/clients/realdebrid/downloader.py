@@ -130,7 +130,7 @@ class RealDebridDownloader:
         # try to find a bundle with any amount of files
         for stream in candidates:
             with structlog.contextvars.bound_contextvars(hash=stream["infoHash"]):
-                bundle = await self._find_bundle_with_file_ratio(stream["infoHash"], 0)
+                bundle = await self._find_bundle_with_file_ratio(stream, 0)
                 if bundle is None:
                     continue
                 downloaded = await self._download(stream, bundle)

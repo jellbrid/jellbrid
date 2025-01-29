@@ -210,55 +210,59 @@ async def handle_requests(
 ):
     async with sync.processing_lock:
         cfg = Config()
-        async with anyio.create_task_group() as tg:
-            async for request in get_requests(seerrs, jc):
-                with structlog.contextvars.bound_contextvars(
-                    **request.ctx, dev_mode=cfg.dev_mode
-                ):
-                    if request.imdb_id == "":
-                        logger.warning("Unable to find IMDB for request")
-                        continue
-                    if cfg.tmdb_id is not None and request.tmdb_id != cfg.tmdb_id:
-                        logger.debug("Skipping non-matching TMDB ID")
-                        continue
-                    match request:
-                        case MovieRequest():
-                            tg.start_soon(
-                                handle_movie_request,
-                                request,
-                                tc,
-                                rdbc,
-                                sync,
-                                dl_repo,
-                                hash_repo,
-                                rc,
-                            )
-                        case SeasonRequest():
-                            tg.start_soon(
-                                handle_season_request,
-                                request,
-                                tc,
-                                rdbc,
-                                sync,
-                                dl_repo,
-                                hash_repo,
-                                rc,
-                                True,
-                            )
-                        case EpisodeRequest():
-                            tg.start_soon(
-                                handle_episode_request,
-                                request,
-                                tc,
-                                rdbc,
-                                sync,
-                                dl_repo,
-                                hash_repo,
-                                rc,
-                            )
-                        case _:
-                            logger.warning("Got unknown media type")
-                    await anyio.sleep(1)
+
+        try:
+            async with anyio.create_task_group() as tg:
+                async for request in get_requests(seerrs, jc):
+                    with structlog.contextvars.bound_contextvars(
+                        **request.ctx, dev_mode=cfg.dev_mode
+                    ):
+                        if request.imdb_id == "":
+                            logger.warning("Unable to find IMDB for request")
+                            continue
+                        if cfg.tmdb_id is not None and request.tmdb_id != cfg.tmdb_id:
+                            logger.debug("Skipping non-matching TMDB ID")
+                            continue
+                        match request:
+                            case MovieRequest():
+                                tg.start_soon(
+                                    handle_movie_request,
+                                    request,
+                                    tc,
+                                    rdbc,
+                                    sync,
+                                    dl_repo,
+                                    hash_repo,
+                                    rc,
+                                )
+                            case SeasonRequest():
+                                tg.start_soon(
+                                    handle_season_request,
+                                    request,
+                                    tc,
+                                    rdbc,
+                                    sync,
+                                    dl_repo,
+                                    hash_repo,
+                                    rc,
+                                    True,
+                                )
+                            case EpisodeRequest():
+                                tg.start_soon(
+                                    handle_episode_request,
+                                    request,
+                                    tc,
+                                    rdbc,
+                                    sync,
+                                    dl_repo,
+                                    hash_repo,
+                                    rc,
+                                )
+                            case _:
+                                logger.warning("Got unknown media type")
+                        await anyio.sleep(1)
+        except* TypeError as excgroup:
+            logger.exception(excgroup.exceptions)
 
     await update_active_downloads(rdbc, dl_repo, sync, seerrs, jc)
 

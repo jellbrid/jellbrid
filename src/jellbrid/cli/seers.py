@@ -23,7 +23,7 @@ async def show_requests():
 
     reqs = []
     for request in await sc.get_processing_requests():
-        async for req in parse_request(sc, jc, request, ignore_partials=False):
+        for req in await parse_request(sc, jc, request, ignore_partials=False):
             reqs.append(req)
     pprint(reqs)
 

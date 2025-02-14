@@ -32,10 +32,7 @@ class SeerrsClient:
         return t.cast(SeerrShowDetail, response)
 
     async def sync_with_jellyfin(self):
-        return await self.client.request(
-            "POST",
-            "settings/jobs/jellyfin-full-scan/run",
-        )
+        return await self.client.request("POST", "settings/jobs/jellyfin-full-scan/run")
 
     async def get_request(self, id: int):
         return await self.client.request("GET", f"request/{id}")

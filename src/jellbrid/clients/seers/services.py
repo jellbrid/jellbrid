@@ -28,12 +28,12 @@ async def parse_request(
             release_date=details["releaseDate"],
             alt_title=details["originalTitle"],
         )
-        yield t.cast(MediaRequest, mr)
-        return
+        return [t.cast(MediaRequest, mr)]
 
     details = await sc.get_show_details(tmdb_id)
     full_request = await sc.get_request(request["id"])
 
+    results: list[MediaRequest] = []
     # process seasons that we already have some media for
     processed_seasons = set()
     for season in full_request["media"]["seasons"]:
@@ -47,14 +47,11 @@ async def parse_request(
             if ignore_partials:
                 continue
 
-            async for req in create_episode_requests(
-                sc,
-                jc,
-                request=request,
-                season_id=season_id,
-                show_info=details,
-            ):
-                yield t.cast(MediaRequest, req)
+            ers = await create_episode_requests(
+                sc, jc, request=request, season_id=season_id, show_info=details
+            )
+            results.extend(t.cast(list[MediaRequest], ers))
+
         elif season["status"] == 2:
             logger.error("How did we get here? We should never get here")
             season_id = season_id
@@ -67,7 +64,7 @@ async def parse_request(
                 episodes=[e["name"] for e in episodes],
                 release_date=details["firstAirDate"],
             )
-            yield t.cast(MediaRequest, sr)
+            results.append(t.cast(MediaRequest, sr))
         elif season["status"] == 1:
             # status is unknown
             processed_seasons.discard(season_id)
@@ -89,7 +86,8 @@ async def parse_request(
             episodes=[e["name"] for e in episodes],
             release_date=details["firstAirDate"],
         )
-        yield t.cast(MediaRequest, sr)
+        results.append(t.cast(MediaRequest, sr))
+    return results
 
 
 async def create_episode_requests(
@@ -112,8 +110,9 @@ async def create_episode_requests(
     for episode in jf_episode_names:
         season_names_to_episodes.pop(episode, None)
 
+    results: list[EpisodeRequest] = []
     for episode in season_names_to_episodes.values():
-        yield EpisodeRequest(
+        er = EpisodeRequest(
             title=show_info["name"],
             alt_title=show_info["originalName"],
             episode_name=episode["name"],
@@ -123,11 +122,13 @@ async def create_episode_requests(
             episode_id=episode["episodeNumber"],
             release_date=episode["airDate"],
         )
+        results.append(er)
+    return results
 
 
 async def get_requests(
     sc: SeerrsClient, jc: JellyfinClient
 ) -> t.AsyncIterator[MediaRequest]:
     for request in await sc.get_processing_requests():
-        async for req in parse_request(sc, jc, request, ignore_partials=False):
+        for req in await parse_request(sc, jc, request, ignore_partials=False):
             yield req

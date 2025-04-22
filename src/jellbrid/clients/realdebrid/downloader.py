@@ -38,7 +38,7 @@ class RealDebridDownloader:
         self.filters = filters or []
         self.filters.extend((filter_samples, filter_extension))
 
-    def _filter_full_season_named_streams(self, streams: list[Stream]):
+    def _filter_full_season_named_streams(self, streams: list[Stream]) -> list[Stream]:
         results = []
         for stream in streams:
             if name_contains_full_season(stream, t.cast(SeasonRequest, self.request)):
@@ -85,7 +85,7 @@ class RealDebridDownloader:
         )
         return bundle
 
-    async def download_movie(self):
+    async def download_movie(self) -> str | None:
         streams = self.streams
         # try to get better results on movies with ambiguous titles
         if len(self.request.title) < 6:
@@ -108,7 +108,7 @@ class RealDebridDownloader:
                     return downloaded
         return None
 
-    async def download_show(self):
+    async def download_show(self) -> str | None:
         # this is probably unecessary for cached streams, but necessary for
         # uncached
         streams = self.streams
@@ -138,7 +138,7 @@ class RealDebridDownloader:
                     return downloaded
         return None
 
-    async def download_episode(self):
+    async def download_episode(self) -> str | None:
         if isinstance(self.request, (MovieRequest, SeasonRequest)):
             raise Exception("Can't download episode for given request type")
 
@@ -182,7 +182,7 @@ class RealDebridDownloader:
     ) -> str | None:
         if self.rdbc.cfg.dev_mode:
             logger.info(
-                "Skipped downloading torrent",
+                "Skipped downloading file",
                 bundle=bundle.bundle if bundle else bundle,
             )
             return ""

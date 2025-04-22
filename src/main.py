@@ -1,3 +1,5 @@
+import typing as t
+
 import anyio
 import structlog
 from anyio.streams.memory import MemoryObjectReceiveStream
@@ -21,8 +23,10 @@ from jellbrid.tasks import (
 
 logger = structlog.get_logger("jellbrid")
 
+Command = t.Literal["process", "update", "clear_stalled"]
 
-async def run_receiver(r_stream: MemoryObjectReceiveStream):
+
+async def run_receiver(r_stream: MemoryObjectReceiveStream[Command]):
     cfg = Config()
     if cfg.dev_mode:
         logger.warning("Running in dev-mode. Nothing will be downloaded")
@@ -64,7 +68,7 @@ async def runit(loop: bool = True):
     await create_db(cfg)
     setup_logging(cfg.jellbrid_log_level)
 
-    send_stream, receive_stream = anyio.create_memory_object_stream[str]()
+    send_stream, receive_stream = anyio.create_memory_object_stream[Command](10)
     async with anyio.create_task_group() as tg:
         tg.start_soon(run_receiver, receive_stream)
 

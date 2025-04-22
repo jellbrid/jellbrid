@@ -141,11 +141,11 @@ async def handle_episode_request(
         streams = await filter_streams_with_bad_hashes(hash_repo, streams)
         rdd = RealDebridDownloader(rdbc, request=request, streams=streams)
 
-        # search for a cached torrent with just the episode we want
+        # search for a cached file with just the episode we want
         downloaded = await rdd.download_episode()
 
         if downloaded is None:
-            # search for the episode we want inside of a cached torrent
+            # search for the episode we want inside of a cached file
             downloaded = await rdd.download_episode_from_bundle()
 
         if downloaded is not None:
@@ -171,7 +171,7 @@ async def update_active_downloads(
                 sync.refresh.set()
                 await repo.delete(request)
             elif info["status"] in ("error", "dead"):
-                logger.warning("Unable to process torrent")
+                logger.warning("Unable to process download")
                 await repo.delete(request)
 
         if sync.refresh.is_set():

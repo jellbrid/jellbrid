@@ -1,7 +1,7 @@
 services:
   jellbrid:
     build: ./
-    image: jellbrid:latest
+    image: ghcr.io/jellbrid/jellbrid:main
     restart: always
     environment:
       - PUID=1000

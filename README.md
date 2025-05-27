@@ -5,6 +5,11 @@ A bridge between Jellyseerr, Jellyfin and Real-Debrid.
 Periodically reads media requests off of Jellyseerr, finds the requested media,
 and makes it available on Jellyfin.
 
+> [!NOTE]  
+> This project is inspired by itsToggle's project, `plex_debrid` and is revamped 
+> replacement. It assumes that pd_zurg is running -- that is what actually makes 
+> media in Real-Debrid available locally.
+
 ## Features
 - Accepts request approval webhooks to instantly process new requests
 - Support for identifying and selecting instantly available media on
@@ -42,6 +47,10 @@ export JELLBRID_LOG_LEVEL=info
 
 Install and then run it:
 `uv sync && uv run cli jellbrid --loop`
+
+## Docker compose
+
+The project supports being run by docker compose. The secrets in the `.env` file should be set on the compose service. For an example, see the `compose.yml` file.
 
 ## Using webhooks
 

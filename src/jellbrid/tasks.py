@@ -1,10 +1,10 @@
 import datetime
+from zoneinfo import ZoneInfo
 
 import anyio
 import structlog
 from anyio.streams.memory import MemoryObjectSendStream
 from hypercorn.asyncio import serve
-from zoneinfo import ZoneInfo
 
 from jellbrid.clients.jellyfin import JellyfinClient, scan_and_wait_for_completion
 from jellbrid.clients.realdebrid import (
@@ -300,6 +300,24 @@ async def clear_stalled_downloads(
             added_at=str(dt),
         )
 
+        bad_hash = BadHash(
+            hash=download["hash"],
+            filename=download["filename"],
+            progress=download["progress"],
+            status=download["status"],
+        )
+        await hash_repo.add(bad_hash)
+        await dl_repo.delete_by_did(download["id"])
+        await rdbc.delete_magnet(download["id"])
+
+    # Clear downloads that are in an error state
+    for download in await rdbc.get_torrents():
+        if download["status"] != "error":
+            continue
+
+        logger.info(
+            "Deleting failed download", id=download["id"], hash=download["hash"]
+        )
         bad_hash = BadHash(
             hash=download["hash"],
             filename=download["filename"],

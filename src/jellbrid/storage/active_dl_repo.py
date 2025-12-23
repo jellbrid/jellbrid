@@ -15,10 +15,12 @@ class ActiveDownloadRepo:
             return
         async with self.session_maker() as session:
             session.add(download)
+            await session.commit()
 
     async def delete(self, download: ActiveDownload):
         async with self.session_maker() as session:
             await session.delete(download)
+            await session.commit()
 
     async def has_movie(self, imdb_id: str):
         async with self.session_maker() as session:
@@ -64,3 +66,4 @@ class ActiveDownloadRepo:
         async with self.session_maker() as session:
             query = delete(ActiveDownload).where(ActiveDownload.torrent_id == did)  # type: ignore
             await session.execute(query)
+            await session.commit()

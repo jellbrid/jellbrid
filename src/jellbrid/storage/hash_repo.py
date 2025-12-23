@@ -15,6 +15,7 @@ class BadHashRepo:
             return
         async with self.session_maker() as session:
             session.add(hash)
+            await session.commit()
 
     async def has(self, hash: str):
         async with self.session_maker() as session:

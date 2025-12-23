@@ -171,6 +171,9 @@ async def update_active_downloads(
             if info["progress"] == 100:
                 sync.refresh.set()
                 await repo.delete(request)
+                logger.info(
+                    f"Deleted completed request for {request.title} {request.torrent_id}"
+                )
             elif info["status"] in ("error", "dead"):
                 logger.warning("Unable to process download")
                 await repo.delete(request)
@@ -328,6 +331,7 @@ async def clear_stalled_downloads(
         await hash_repo.add(bad_hash)
         await dl_repo.delete_by_did(download["id"])
         await rdbc.delete_magnet(download["id"])
+    logger.info("Finished stalled downloads check")
 
 
 async def filter_streams_with_bad_hashes(

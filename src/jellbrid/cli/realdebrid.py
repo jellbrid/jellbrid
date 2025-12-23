@@ -9,7 +9,12 @@ from rich.pretty import pprint
 from jellbrid.cli.base import AsyncTyper
 from jellbrid.clients.realdebrid import RealDebridClient, TorrentStatus
 from jellbrid.config import Config
-from jellbrid.storage import ActiveDownloadRepo, BadHashRepo, create_db, get_session
+from jellbrid.storage import (
+    ActiveDownloadRepo,
+    BadHashRepo,
+    create_db,
+    get_session_maker,
+)
 from jellbrid.tasks import clear_stalled_downloads
 
 app = AsyncTyper()
@@ -54,8 +59,8 @@ async def clear_stalled(hours: Annotated[int, typer.Option("--hours", "-h")] = 3
     rdbc = RealDebridClient(cfg)
     await create_db(cfg)
 
-    repo = ActiveDownloadRepo(get_session())
-    brepo = BadHashRepo(get_session())
+    repo = ActiveDownloadRepo(get_session_maker())
+    brepo = BadHashRepo(get_session_maker())
     await clear_stalled_downloads(rdbc, repo, brepo, hours)
 
 

@@ -35,10 +35,6 @@ def get_session_maker() -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
-def get_session():
-    return get_session_maker()()
-
-
 async def create_db(cfg: Config):
     global engine
     engine = create_async_engine(f"sqlite+aiosqlite:///{cfg.db}")

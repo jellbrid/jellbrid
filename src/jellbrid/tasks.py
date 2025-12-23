@@ -181,6 +181,7 @@ async def update_active_downloads(
         if sync.refresh.is_set():
             await update_media(jc, seerrs)
             sync.reset()
+        logger.info("Finised updating active downloads")
 
 
 async def update_media(jc: JellyfinClient, seerrs: SeerrsClient):

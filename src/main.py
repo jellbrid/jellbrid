@@ -11,7 +11,12 @@ from jellbrid.clients.torrentio import TorrentioClient
 from jellbrid.config import Config
 from jellbrid.logging import setup_logging
 from jellbrid.requests import RequestCache
-from jellbrid.storage import ActiveDownloadRepo, BadHashRepo, create_db, get_session
+from jellbrid.storage import (
+    ActiveDownloadRepo,
+    BadHashRepo,
+    create_db,
+    get_session_maker,
+)
 from jellbrid.sync import Synchronizer
 from jellbrid.tasks import (
     clear_stalled_downloads,
@@ -35,8 +40,8 @@ async def run_receiver(r_stream: MemoryObjectReceiveStream[Command]):
     tc = TorrentioClient(cfg)
     seerrs = SeerrsClient(cfg)
     jc = JellyfinClient(cfg)
-    dl_repo = ActiveDownloadRepo(get_session())
-    hash_repo = BadHashRepo(get_session())
+    dl_repo = ActiveDownloadRepo(get_session_maker())
+    hash_repo = BadHashRepo(get_session_maker())
     sync = Synchronizer(cfg)
     rc = RequestCache()
 

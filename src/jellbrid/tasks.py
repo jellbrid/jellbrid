@@ -1,10 +1,10 @@
 import datetime
-from zoneinfo import ZoneInfo
 
 import anyio
 import structlog
 from anyio.streams.memory import MemoryObjectSendStream
 from hypercorn.asyncio import serve
+from zoneinfo import ZoneInfo
 
 from jellbrid.clients.jellyfin import JellyfinClient, scan_and_wait_for_completion
 from jellbrid.clients.realdebrid import (
@@ -36,6 +36,7 @@ async def start_server(send_stream: MemoryObjectSendStream):
 async def periodic_send(stream: MemoryObjectSendStream, message: str, period: int = 60):
     while True:
         await stream.send(message)
+        logger.debug(f"Sent periodic task: {message}")
         await anyio.sleep(period)
 
 

@@ -27,3 +27,12 @@ class Config:
 
         self.server_port = env.int("JELLBRID_SERVER_PORT", default=9090)
         self.tmdb_id: int | None = env.int("JELLBRID_TMDBID", default=None)
+
+        # How often to check active downloads for completion
+        self.update_interval_s: int = env.int("JELLBRID_UPDATE_INTERVAL_S", default=300)
+        # How often to iterate and search over requests
+        self.process_interval_s: int = env.int(
+            "JELLBRID_PROCESS_INTERVAL_S", default=600
+        )
+        # How often to for and clear stalled downloads
+        self.clear_interval_s: int = env.int("JELLBRID_CLEAR_INTERVAL_S", default=300)

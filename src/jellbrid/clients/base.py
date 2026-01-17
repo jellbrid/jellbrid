@@ -1,4 +1,5 @@
 import json
+import logging
 import urllib.parse
 
 import httpx
@@ -19,7 +20,12 @@ class BaseClient:
         } | headers
         self.client = client
 
-    @tenacity.retry(wait=tenacity.wait.wait_exponential_jitter())
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(5),
+        wait=tenacity.wait.wait_exponential_jitter(),
+        before_sleep=tenacity.before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
     async def request(
         self,
         method: str,
@@ -50,7 +56,6 @@ class BaseClient:
         if response.status_code >= 500:
             logger.warning(
                 "Encountered server error. Performing a retry with exponential backoff",
-                error=response.json(),
             )
             raise tenacity.TryAgain
 

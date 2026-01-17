@@ -42,13 +42,17 @@ class BaseClient:
 
         logger.debug(f"{method} {response.request.url}", response=response.status_code)
         if response.status_code == 429:
-            logger.warning("Performing a retry with exponential backoff")
-            raise tenacity.TryAgain
-        if response.status_code >= 400:
             logger.warning(
-                "Encountered terminal error. Attempting to continue",
+                "Request was rate limited. Performing a retry with exponential backoff",
                 error=response.json(),
             )
+            raise tenacity.TryAgain
+        if response.status_code >= 500:
+            logger.warning(
+                "Encountered server error. Performing a retry with exponential backoff",
+                error=response.json(),
+            )
+            raise tenacity.TryAgain
 
         try:
             return response.json()

@@ -36,7 +36,15 @@ async def start_server(send_stream: MemoryObjectSendStream):
 async def periodic_send(stream: MemoryObjectSendStream, message: str, period: int = 60):
     while True:
         await stream.send(message)
-        logger.debug(f"Sent periodic task: {message}")
+        stats = stream.statistics()
+        logger.debug(
+            f"Sent periodic task: {message}",
+            curr_buffer_size=stats.current_buffer_used,
+            n_receive_streams=stats.open_receive_streams,
+            n_send_streams=stats.open_send_streams,
+            tasks_waiting_receive=stats.tasks_waiting_receive,
+            tasks_waiting_send=stats.tasks_waiting_send,
+        )
         await anyio.sleep(period)
 
 

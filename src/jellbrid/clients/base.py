@@ -36,7 +36,6 @@ class BaseClient:
         headers.update(self.base_headers)
 
         url = urllib.parse.urljoin(self.base_url, path)
-        logger.debug(f"Starting request: {method} {url}")
         response = await self.client.request(
             method, url, headers=headers, params=params, json=json_, data=data
         )

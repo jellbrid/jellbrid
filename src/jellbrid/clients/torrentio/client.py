@@ -23,7 +23,7 @@ class QualityFilter(enum.Enum):
 
 class TorrentioClient:
     def __init__(self, cfg: Config):
-        self.client = BaseClient(cfg.torrentio_url)
+        self.client = BaseClient(cfg.torrentio_url, {"User-Agent": "HTTPie/3.2.2"})
         self.cfg = cfg
         self.rd_api_key = cfg.rd_api_key
 
